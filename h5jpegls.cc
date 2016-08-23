@@ -250,7 +250,7 @@ __attribute__((constructor)) void init_threadpool() {
         threads = atoi(envvar);
     }
     if (threads <= 0) {
-        threads = 8;
+        threads = std::min(std::thread::hardware_concurrency(), 8u);
     }
     filter_pool = new ThreadPool(threads);
 }
