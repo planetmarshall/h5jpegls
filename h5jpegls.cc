@@ -245,7 +245,7 @@ const void *H5PLget_plugin_info(void) {return H5Z_JPEGLS; }
 
 __attribute__((constructor)) void init_threadpool() {
     int threads = 0;
-    char* envvar = getenv("HDF_FILTER_THREADS");
+    char* envvar = getenv("HDF5_FILTER_THREADS");
     if (envvar != NULL) {
         threads = atoi(envvar);
     }
