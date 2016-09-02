@@ -72,6 +72,10 @@ public:
         sleeper_condition.notify_one();
     }
     
+    int get_threads() const {
+        return workers.size();
+    }
+
 private:
     // need to keep track of threads so we can join them
     std::vector< std::thread > workers;
