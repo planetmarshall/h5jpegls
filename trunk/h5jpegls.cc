@@ -22,9 +22,26 @@ using std::vector;
 // Temporary unofficial filter ID
 const H5Z_filter_t H5Z_FILTER_JPEGLS = 32012;
 
+int get_threads() {
+    int threads = 0;
+    char* envvar = getenv("HDF5_FILTER_THREADS");
+    if (envvar != NULL) {
+        threads = atoi(envvar);
+    }
+    if (threads <= 0) {
+        threads = std::min(std::thread::hardware_concurrency(), 8u);
+    }
+    return threads;
+}
+
 size_t codec_filter(unsigned int flags, size_t cd_nelmts,
     const unsigned int cd_values[], size_t nbytes, size_t *buf_size, void **buf) {
 
+    int threads = get_threads();
+    if (filter_pool == nullptr || filter_pool->get_threads() != threads) {
+        delete filter_pool;
+        filter_pool = new ThreadPool(threads);
+    }
     filter_pool->lock_buffers();
 
     int length = 1;
@@ -242,18 +259,6 @@ const H5Z_class2_t H5Z_JPEGLS[1] = {{
 H5PL_type_t H5PLget_plugin_type(void) {return H5PL_TYPE_FILTER; }
 const void *H5PLget_plugin_info(void) {return H5Z_JPEGLS; }
 
-
-__attribute__((constructor)) void init_threadpool() {
-    int threads = 0;
-    char* envvar = getenv("HDF5_FILTER_THREADS");
-    if (envvar != NULL) {
-        threads = atoi(envvar);
-    }
-    if (threads <= 0) {
-        threads = std::min(std::thread::hardware_concurrency(), 8u);
-    }
-    filter_pool = new ThreadPool(threads);
-}
 
 __attribute__((destructor)) void destroy_threadpool() {
     delete filter_pool;
