@@ -34,6 +34,7 @@ target_link_libraries(
         hdf5::hdf5
         Threads::Threads)
 
+set_target_properties(h5jpegls PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON)
 install(
         TARGETS h5jpegls
         EXPORT h5jpegls_targets
