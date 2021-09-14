@@ -1,8 +1,7 @@
 cmake_minimum_required(VERSION 3.18)
 project(h5jpegls VERSION 1.0 LANGUAGES CXX)
 
-add_library(h5jpegls SHARED h5jpegls.cc threadpool.h)
-add_library(h5jpegls::h5jpegls ALIAS h5jpegls)
+add_library(h5jpegls MODULE h5jpegls.cc threadpool.h)
 
 if (EXISTS "${CMAKE_BINARY_DIR}/conanbuildinfo.cmake")
     include(${CMAKE_BINARY_DIR}/conanbuildinfo.cmake)

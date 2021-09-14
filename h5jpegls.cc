@@ -241,7 +241,7 @@ herr_t h5jpegls_set_local(hid_t dcpl_id, hid_t type_id, hid_t chunk_space_id) {
     return 1;
 }
 
-const H5Z_class2_t H5Z_JPEGLS[1] = {{
+extern "C" const H5Z_class2_t H5Z_JPEGLS[1] = {{
     H5Z_CLASS_T_VERS,                 /* H5Z_class_t version */
     (H5Z_filter_t)H5Z_FILTER_JPEGLS,         /* Filter id number */
     1,              /* encoder_present flag (set to true) */
