@@ -15,14 +15,19 @@
 const int jpegls_filter_id = 32012;
 
 TEST_CASE("round trip a compressed dataset", "[h5jpegls]") {
-    hid_t file, space, dset, dcpl; /* Handles */
+    // Adapted from https://github.com/HDFGroup/hdf5_plugins/blob/master/BZIP2/example/h5ex_d_bzip2.c
+    hid_t file_id = -1;
+    hid_t space_id = -1;
+    hid_t dset_id = -1;
+    hid_t dcpl_id = -1; /* Handles */
     herr_t status;
     H5Z_filter_t filter_id = 0;
     char filter_name[80];
-    hsize_t dims[2] = {DIM0, DIM1}, chunk[2] = {CHUNK0, CHUNK1};
+    hsize_t dims[2] = {DIM0, DIM1}, 
+            chunk[2] = {CHUNK0, CHUNK1};
     size_t nelmts = 1;                     /* number of elements in cd_values */
-    const unsigned int cd_values[1] = {6}; /* bzip2 default level is 2 */
-    unsigned int values_out[1] = {99};
+    const unsigned int cd_values[8] = {0, 0, 0, 0, 0, 0, 0, 0}; /* bzip2 default level is 2 */
+    unsigned int values_out[8] = {99, 99, 99, 99, 99, 99, 99, 99};
     unsigned int flags;
     htri_t avail;
     unsigned filter_config;
@@ -40,20 +45,32 @@ TEST_CASE("round trip a compressed dataset", "[h5jpegls]") {
     /*
      * Create a new file using the default properties.
      */
-    file = H5Fcreate(FILE, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+    file_id = H5Fcreate(FILE, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+    if (file_id < 0) {
+        FAIL("Error creating file");
+    }
 
     /*
      * Create dataspace. Setting maximum size to NULL sets the maximum
      * size to be the current size.
      */
-    space = H5Screate_simple(2, dims, NULL);
+    space_id = H5Screate_simple(2, dims, NULL);
+    if (space_id < 0) {
+        FAIL("Error creating dataspace");
+    }
 
     /*
      * Create the dataset creation property list, add the bzip2
      * compression filter and set the chunk size.
      */
-    dcpl = H5Pcreate(H5P_DATASET_CREATE);
-    status = H5Pset_filter(dcpl, jpegls_filter_id, H5Z_FLAG_MANDATORY, (size_t)6, cd_values);
+    dcpl_id = H5Pcreate(H5P_DATASET_CREATE);
+    if (dcpl_id < 0) {
+        FAIL("Error creating dataset properties");
+    }
+    status = H5Pset_filter(dcpl_id, jpegls_filter_id, H5Z_FLAG_OPTIONAL, 0, NULL);
+    if (status < 0) {
+        FAIL("Error setting filter");
+    }
 
     /*
      * Check that filter is registered with the library now.
@@ -65,27 +82,46 @@ TEST_CASE("round trip a compressed dataset", "[h5jpegls]") {
         if ((filter_config & H5Z_FILTER_CONFIG_ENCODE_ENABLED) && (filter_config & H5Z_FILTER_CONFIG_DECODE_ENABLED))
             printf("bzip2 filter is available for encoding and decoding.\n");
     }
-    status = H5Pset_chunk(dcpl, 2, chunk);
+    else {
+        FAIL("Filter could not be found");
+    }
+    status = H5Pset_chunk(dcpl_id, 2, chunk);
+    if (status < 0) {
+        FAIL("Error setting chunk size");
+    }
 
     /*
      * Create the dataset.
      */
     printf("....Writing bzip2 compressed data ................\n");
-    dset = H5Dcreate(file, DATASET, H5T_STD_I32LE, space, H5P_DEFAULT, dcpl, H5P_DEFAULT);
+    dset_id = H5Dcreate(file_id, DATASET, H5T_STD_I32LE, space_id, H5P_DEFAULT, dcpl_id, H5P_DEFAULT);
+    if (dset_id < 0) {
+        FAIL("Error creating dataset");
+    }
 
     /*
      * Write the data to the dataset.
      */
-    status = H5Dwrite(dset, H5T_NATIVE_INT, H5S_ALL, H5S_ALL, H5P_DEFAULT, wdata[0]);
+    status = H5Dwrite(dset_id, H5T_NATIVE_INT, H5S_ALL, H5S_ALL, H5P_DEFAULT, wdata[0]);
+    if (status < 0) {
+        FAIL("Error writing to dataset");
+    }
 
     /*
      * Close and release resources.
      */
-    status = H5Pclose(dcpl);
-    status = H5Dclose(dset);
-    status = H5Sclose(space);
-    status = H5Fclose(file);
+    H5Dclose(dset_id);
+    dset_id = -1;
+    H5Pclose(dcpl_id);
+    dcpl_id = -1;
+    H5Sclose(space_id);
+    space_id = -1;
+    H5Fclose(file_id);
+    file_id = -1;
     status = H5close();
+    if (status < 0) {
+        FAIL("Error closing library");
+    }
 
     printf("....Close the file and reopen for reading ........\n");
     /*
@@ -95,18 +131,28 @@ TEST_CASE("round trip a compressed dataset", "[h5jpegls]") {
     /*
      * Open file and dataset using the default properties.
      */
-    file = H5Fopen(FILE, H5F_ACC_RDONLY, H5P_DEFAULT);
-    dset = H5Dopen(file, DATASET, H5P_DEFAULT);
+    file_id = H5Fopen(FILE, H5F_ACC_RDONLY, H5P_DEFAULT);
+    if (file_id < 0) {
+        FAIL("Error opening file");
+    }
+
+    dset_id = H5Dopen(file_id, DATASET, H5P_DEFAULT);
+    if (dset_id < 0) {
+        FAIL("Error opening dataset");
+    }
 
     /*
      * Retrieve dataset creation property list.
      */
-    dcpl = H5Dget_create_plist(dset);
+    dcpl_id = H5Dget_create_plist(dset_id);
+    if (dcpl_id < 0) {
+        FAIL("Error getting dataset property list");
+    }
     /*
     * Retrieve and print the filter id, compression level and filter's name
    for bzip2.
     */
-    filter_id = H5Pget_filter2(dcpl, (unsigned)0, &flags, &nelmts, values_out, sizeof(filter_name), filter_name, NULL);
+    filter_id = H5Pget_filter2(dcpl_id, (unsigned)0, &flags, &nelmts, values_out, sizeof(filter_name), filter_name, NULL);
     printf("Filter info is available from the dataset creation property \n ");
     printf(" Filter identifier is ");
     switch (filter_id) {
@@ -124,8 +170,10 @@ TEST_CASE("round trip a compressed dataset", "[h5jpegls]") {
      * Read the data using the default properties.
      */
     printf("....Reading bzip2 compressed data ................\n");
-    status = H5Dread(dset, H5T_NATIVE_INT, H5S_ALL, H5S_ALL, H5P_DEFAULT, rdata[0]);
-
+    status = H5Dread(dset_id, H5T_NATIVE_INT, H5S_ALL, H5S_ALL, H5P_DEFAULT, rdata[0]);
+    if (status < 0) {
+        FAIL("Error reading data");
+    }
     /*
      * Find the maximum value in the dataset, to verify that it was
      * read correctly.
@@ -151,9 +199,18 @@ TEST_CASE("round trip a compressed dataset", "[h5jpegls]") {
     /*
      * Close and release resources.
      */
-    status = H5Pclose(dcpl);
-    status = H5Dclose(dset);
-    status = H5Fclose(file);
+    if (dcpl_id >= 0) {
+        H5Pclose(dcpl_id);
+    }
+    if (dset_id >= 0) {
+        H5Dclose(dset_id);
+    }
+    if (space_id >= 0) {
+        H5Sclose(space_id);
+    }
+    if (file_id >= 0) {
+        H5Fclose(file_id);
+    }
 
     SUCCEED();
 }

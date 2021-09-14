@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.19)
+cmake_minimum_required(VERSION 3.18)
 project(h5jpegls VERSION 1.0 LANGUAGES CXX)
 
 add_library(h5jpegls SHARED h5jpegls.cc threadpool.h)
@@ -19,6 +19,12 @@ if(NOT Catch2_FOUND)
 else()
     add_subdirectory(test)
 endif()
+
+target_compile_features(
+   h5jpegls
+   PUBLIC
+   cxx_std_17
+   )
 
 target_link_libraries(
         h5jpegls

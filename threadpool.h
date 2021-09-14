@@ -13,6 +13,12 @@
 #include <iostream>
 #include <map>
 #include <chrono>
+#include <malloc.h>
+
+#ifdef _MSC_VER
+#define aligned_alloc _aligned_malloc
+#endif
+
 using std::map;
 using std::vector;
 
@@ -165,11 +171,13 @@ inline ThreadPool::ThreadPool(size_t threads)
         }    
     });
     
+#ifndef _MSC_VER
     sched_param sch_params;
     sch_params.sched_priority = sched_get_priority_min(SCHED_IDLE);
     if (pthread_setschedparam(sleeper.native_handle(), SCHED_IDLE, &sch_params)) {
         printf("Error while trying to demote sleeper thread\n");
     }
+#endif
 }
 
 // add new work item to the pool
