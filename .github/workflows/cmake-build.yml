@@ -52,6 +52,11 @@ jobs:
       - name: build with cmake
         run: |
           conan build . --build-folder build
+      - name: run tests
+        run: |
+          cd build
+          export HDF5_PLUGIN_PATH=$(pwd)
+          ctest --extra-verbose
   windows-build:
     strategy:
       matrix:
@@ -90,6 +95,12 @@ jobs:
       - name: build with cmake
         run: |
           conan build . --build-folder build
+        shell: bash
+      - name: run tests
+        run: |
+          cd build
+          export HDF5_PLUGIN_PATH=$(pwd)
+          ctest --extra-verbose
         shell: bash
   mac-build:
     runs-on: macos-10.15
@@ -132,3 +143,9 @@ jobs:
       - name: build with cmake
         run: |
           conan build . --build-folder build
+      - name: run tests
+        run: |
+          cd build
+          export HDF5_PLUGIN_PATH=$(pwd)
+          ctest --extra-verbose
+        shell: bash
