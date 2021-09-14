@@ -28,6 +28,11 @@ class H5jpeglsConan(ConanFile):
         self.requires("hdf5/1.12.0")
         self.requires("charls/2.1.0")
 
+    def build_requirements(self):
+        self.build_requires("catch2/2.13.7")
+        if self.settings.get_safe("compiler.toolset") is None:
+            self.build_requires("ninja/1.10.2")
+
     def _configure_cmake(self):
         if self._cmake is not None:
             return self._cmake
