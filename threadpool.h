@@ -13,9 +13,9 @@
 #include <iostream>
 #include <map>
 #include <chrono>
-#include <malloc.h>
 
 #ifdef _MSC_VER
+#include <malloc.h>
 #define aligned_alloc _aligned_malloc
 #endif
 
