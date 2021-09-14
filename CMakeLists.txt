@@ -17,6 +17,7 @@ find_package(Catch2 QUIET)
 if(NOT Catch2_FOUND)
     message(WARNING "Catch2 not found - C++ tests will not be available")
 else()
+    enable_testing()
     add_subdirectory(test)
 endif()
 
