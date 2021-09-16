@@ -45,8 +45,9 @@ class H5jpeglsConan(ConanFile):
         return self._cmake
 
     def build(self):
-        cmake = self._configure_cmake()
-        cmake.build()
+        with tools.run_environment(self):
+            cmake = self._configure_cmake()
+            cmake.build()
 
     def package(self):
         cmake = self._configure_cmake()
