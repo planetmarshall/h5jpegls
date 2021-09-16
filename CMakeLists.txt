@@ -36,7 +36,8 @@ target_link_libraries(
         hdf5::hdf5
         Threads::Threads)
 
-set_target_properties(h5jpegls PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON)
+set_target_properties(h5jpegls PROPERTIES LIBRARY_OUTPUT_DIRECTORY plugins)
+
 install(
         TARGETS h5jpegls
         EXPORT h5jpegls_targets
@@ -44,6 +45,7 @@ install(
 )
 
 set(CPACK_PACKAGE_VENDOR "Andrew Marshall")
+set(CPACK_PACKAGE_CONTACT "planetmarshalluk@gmail.com")
 set(CPACK_PACKAGE_DESCRIPTION "h5jpegls Compression Filter Plugin for HDF5")
 set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE.txt")
 set(CPACK_RESOURCE_FILE_README "${CMAKE_CURRENT_SOURCE_DIR}/README.md")
