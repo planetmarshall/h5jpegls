@@ -56,7 +56,8 @@ jobs:
         run: |
           cd build
           export HDF5_PLUGIN_PATH=$(pwd)
-          ctest --extra-verbose
+          source activate_run.sh
+          ctest --extra-verbose --no-tests=error
   windows-build:
     strategy:
       matrix:
@@ -100,7 +101,8 @@ jobs:
         run: |
           cd build
           export HDF5_PLUGIN_PATH=$(pwd)
-          ctest --extra-verbose
+          source activate_run.sh
+          ctest --extra-verbose --no-tests=error
         shell: bash
   mac-build:
     runs-on: macos-10.15
@@ -147,5 +149,6 @@ jobs:
         run: |
           cd build
           export HDF5_PLUGIN_PATH=$(pwd)
-          ctest --extra-verbose
+          source activate_run.sh
+          ctest --extra-verbose --no-tests=error
         shell: bash
