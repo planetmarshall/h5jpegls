@@ -56,7 +56,6 @@ jobs:
         run: |
           cd build
           export HDF5_PLUGIN_PATH=$(pwd)
-          source activate_run.sh
           ctest --extra-verbose --no-tests=error
   windows-build:
     strategy:
@@ -141,8 +140,7 @@ jobs:
           conan install . \
             --install-folder build \
             --lockfile conan.lock \
-            --build missing \
-            --generator virtualrunenv
+            --build missing
       - name: build with cmake
         run: |
           conan build . --build-folder build
