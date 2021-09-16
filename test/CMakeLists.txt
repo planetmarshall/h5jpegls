@@ -3,6 +3,7 @@ add_dependencies(h5jpegls_test h5jpegls)
 target_link_libraries(h5jpegls_test
         PRIVATE
         hdf5::hdf5
+	Threads::Threads
         Catch2::Catch2)
 
 include(CTest)
