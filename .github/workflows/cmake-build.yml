@@ -55,7 +55,7 @@ jobs:
       - name: run tests
         run: |
           cd build
-          export HDF5_PLUGIN_PATH=$(pwd)
+          export HDF5_PLUGIN_PATH=$(pwd)/plugins
           ctest --extra-verbose --no-tests=error
       - name: build package
         run: |
@@ -108,7 +108,8 @@ jobs:
       - name: run tests
         run: |
           cd build
-          $env:HDF5_PLUGIN_PATH=Get-Location
+          $build_folder=Get-Location
+          $env:HDF5_PLUGIN_PATH=Join-Path -Path $build-folder -ChildPath plugins
           .\activate_run.ps1
           ctest --extra-verbose --no-tests=error
       - name: build package
@@ -163,7 +164,7 @@ jobs:
       - name: run tests
         run: |
           cd build
-          export HDF5_PLUGIN_PATH=$(pwd)
+          export HDF5_PLUGIN_PATH=$(pwd)/plugins
           source activate_run.sh
           ctest --extra-verbose --no-tests=error
         shell: bash
