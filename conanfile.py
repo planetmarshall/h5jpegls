@@ -11,7 +11,10 @@ class H5jpeglsConan(ConanFile):
     topics = ("hdf5", "compression")
     settings = "os", "compiler", "build_type", "arch"
     options = {"fPIC": [True, False]}
-    default_options = {"fPIC": True}
+    default_options = {
+        "fPIC": True,
+        "hdf5:shared": True  # See https://github.com/HDFGroup/hdf5/issues/1009
+    }
     generators = "cmake", "cmake_find_package"
     scm = {
         "type": "git",
