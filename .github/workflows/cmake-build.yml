@@ -57,6 +57,14 @@ jobs:
           cd build
           export HDF5_PLUGIN_PATH=$(pwd)
           ctest --extra-verbose --no-tests=error
+      - name: build package
+        run: |
+          cpack -G DEB -B package --config build/CPackConfig.cmake 
+      - name: upload package
+        uses: actions/upload-artifact@v2
+        with:
+          name: linux-package
+          path: package/*.zip
   windows-build:
     strategy:
       matrix:
@@ -104,6 +112,15 @@ jobs:
           source activate_run.sh
           ctest --extra-verbose --no-tests=error
         shell: bash
+      - name: build package
+        run: |
+          cpack -G NSIS -B package --config build/CPackConfig.cmake 
+        shell: bash
+      - name: upload package
+        uses: actions/upload-artifact@v2
+        with:
+          name: windows-package
+          path: package/*.exe
   mac-build:
     runs-on: macos-10.15
     steps:
@@ -151,3 +168,11 @@ jobs:
           source activate_run.sh
           ctest --extra-verbose --no-tests=error
         shell: bash
+      - name: build package
+        run: |
+          cpack -G BUNDLE -B package --config build/CPackConfig.cmake 
+      - name: upload package
+        uses: actions/upload-artifact@v2
+        with:
+          name: macos-package
+          path: package/*
