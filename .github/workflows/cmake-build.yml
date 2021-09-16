@@ -164,7 +164,7 @@ jobs:
       - name: run tests
         run: |
           cd build
-          bin/h5jpegls_test.exe -l
+          bin/h5jpegls_test -l
           export HDF5_PLUGIN_PATH=$(pwd)/plugins
           ctest --extra-verbose --no-tests=error
         shell: bash
