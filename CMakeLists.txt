@@ -36,7 +36,7 @@ target_link_libraries(
         hdf5::hdf5
         Threads::Threads)
 
-set_target_properties(h5jpegls PROPERTIES LIBRARY_OUTPUT_DIRECTORY plugins)
+set_target_properties(h5jpegls PROPERTIES LIBRARY_OUTPUT_DIRECTORY $<$<CONFIG:Release,Debug,RelWithDebInfo,MinSizeRel>:plugins>)
 
 install(
         TARGETS h5jpegls
