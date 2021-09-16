@@ -108,10 +108,9 @@ jobs:
       - name: run tests
         run: |
           cd build
-          export HDF5_PLUGIN_PATH=$(pwd)
-          source activate_run.sh
+          $env:HDF5_PLUGIN_PATH=Get-Location
+          .\activate_run.ps1
           ctest --extra-verbose --no-tests=error
-        shell: bash
       - name: build package
         run: |
           cpack -G NSIS -B package --config build/CPackConfig.cmake 

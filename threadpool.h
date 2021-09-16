@@ -65,7 +65,6 @@ public:
 
     
     inline unsigned char* get_global_buffer(int buffer_id, size_t size) {
-        size = next_power_of_two(size);
         std::lock_guard<std::mutex> lock(gb_mutex);
         auto it = global_buffers.find(buffer_id);
         if (it == global_buffers.end()) {
