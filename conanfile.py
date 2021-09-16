@@ -49,6 +49,10 @@ class H5jpeglsConan(ConanFile):
             cmake = self._configure_cmake()
             cmake.build()
 
+    def imports(self):
+        self.copy("*.dll", "", "bin")
+        self.copy("*.dylib", "", "lib")
+
     def package(self):
         cmake = self._configure_cmake()
         cmake.install()

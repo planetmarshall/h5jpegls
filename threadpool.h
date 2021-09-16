@@ -16,7 +16,18 @@
 
 #ifdef _MSC_VER
 #include <malloc.h>
-#define aligned_alloc _aligned_malloc
+inline size_t next_power_of_two(size_t v) {
+    // From https://graphics.stanford.edu/~seander/bithacks.html#RoundUpPowerOf2
+    v--;
+    v |= v >> 1;
+    v |= v >> 2;
+    v |= v >> 4;
+    v |= v >> 8;
+    v |= v >> 16;
+    v |= v >> 32;
+    return ++v;
+}
+#define aligned_alloc(alignment, size) _aligned_malloc((alignment), next_power_of_two(size))
 #endif
 
 using std::map;
@@ -51,8 +62,10 @@ public:
         }
         return buffers[ti][buffer_id].data;
     }
+
     
     inline unsigned char* get_global_buffer(int buffer_id, size_t size) {
+        size = next_power_of_two(size);
         std::lock_guard<std::mutex> lock(gb_mutex);
         auto it = global_buffers.find(buffer_id);
         if (it == global_buffers.end()) {
