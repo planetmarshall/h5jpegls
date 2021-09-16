@@ -109,7 +109,7 @@ jobs:
         run: |
           cd build
           $build_folder=Get-Location
-          $env:HDF5_PLUGIN_PATH=Join-Path -Path $build-folder -ChildPath plugins
+          $env:HDF5_PLUGIN_PATH=Join-Path -Path $build_folder -ChildPath plugins
           .\activate_run.ps1
           ctest --extra-verbose --no-tests=error
       - name: build package
@@ -164,6 +164,7 @@ jobs:
       - name: run tests
         run: |
           cd build
+          bin/h5jpegls_test.exe -l
           export HDF5_PLUGIN_PATH=$(pwd)/plugins
           ctest --extra-verbose --no-tests=error
         shell: bash
