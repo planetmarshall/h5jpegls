@@ -32,7 +32,7 @@ TEST_CASE("round trip a compressed dataset", "[h5jpegls]") {
     unsigned int flags;
     htri_t avail;
     unsigned filter_config;
-    int wdata[DIM0][DIM1], /* Write buffer */
+    int16_t wdata[DIM0][DIM1], /* Write buffer */
         rdata[DIM0][DIM1], /* Read buffer */
         max, i, j;
 
@@ -95,7 +95,7 @@ TEST_CASE("round trip a compressed dataset", "[h5jpegls]") {
      * Create the dataset.
      */
     printf("....Writing bzip2 compressed data ................\n");
-    dset_id = H5Dcreate(file_id, DATASET, H5T_STD_I32LE, space_id, H5P_DEFAULT, dcpl_id, H5P_DEFAULT);
+    dset_id = H5Dcreate(file_id, DATASET, H5T_STD_I16LE, space_id, H5P_DEFAULT, dcpl_id, H5P_DEFAULT);
     if (dset_id < 0) {
         FAIL("Error creating dataset");
     }
@@ -103,7 +103,7 @@ TEST_CASE("round trip a compressed dataset", "[h5jpegls]") {
     /*
      * Write the data to the dataset.
      */
-    status = H5Dwrite(dset_id, H5T_NATIVE_INT, H5S_ALL, H5S_ALL, H5P_DEFAULT, wdata[0]);
+    status = H5Dwrite(dset_id, H5T_STD_I16LE, H5S_ALL, H5S_ALL, H5P_DEFAULT, wdata[0]);
     if (status < 0) {
         FAIL("Error writing to dataset");
     }
@@ -171,7 +171,7 @@ TEST_CASE("round trip a compressed dataset", "[h5jpegls]") {
      * Read the data using the default properties.
      */
     printf("....Reading bzip2 compressed data ................\n");
-    status = H5Dread(dset_id, H5T_NATIVE_INT, H5S_ALL, H5S_ALL, H5P_DEFAULT, rdata[0]);
+    status = H5Dread(dset_id, H5T_STD_I16LE, H5S_ALL, H5S_ALL, H5P_DEFAULT, rdata[0]);
     if (status < 0) {
         FAIL("Error reading data");
     }
