@@ -63,8 +63,8 @@ jobs:
       - name: upload package
         uses: actions/upload-artifact@v2
         with:
-          name: linux-package
-          path: package/*.zip
+          name: linux-${{ matrix.profile }}-package
+          path: package/*.deb
   windows-build:
     strategy:
       matrix:
@@ -165,7 +165,6 @@ jobs:
         run: |
           cd build
           export HDF5_PLUGIN_PATH=$(pwd)/plugins
-          source activate_run.sh
           ctest --extra-verbose --no-tests=error
         shell: bash
       - name: build package
