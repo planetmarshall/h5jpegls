@@ -1,5 +1,8 @@
 cmake_minimum_required(VERSION 3.18)
-project(h5jpegls VERSION 1.0 LANGUAGES CXX)
+project(h5jpegls 
+    VERSION 0.2.0  
+    HOMEPAGE_URL https://github.com/planetmarshall/jpegls-hdf-filter
+    LANGUAGES CXX)
 
 add_library(h5jpegls MODULE h5jpegls.cc threadpool.h)
 
@@ -37,6 +40,18 @@ set_target_properties(h5jpegls PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON)
 install(
         TARGETS h5jpegls
         EXPORT h5jpegls_targets
-        LIBRARY DESTINATION lib
-        RUNTIME DESTINATION bin
+        LIBRARY DESTINATION hdf5/lib/plugin
 )
+
+set(CPACK_PACKAGE_VENDOR "Andrew Marshall")
+set(CPACK_PACKAGE_DESCRIPTION "h5jpegls Compression Filter Plugin for HDF5")
+set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE.txt")
+set(CPACK_RESOURCE_FILE_README "${CMAKE_CURRENT_SOURCE_DIR}/README.md")
+set(CPACK_PACKAGE_INSTALL_DIRECTORY "")
+if (WIN32)
+    file(TO_CMAKE_PATH "$ENV{ALLUSERSPROFILE}" ALL_USERS_PROFILE)
+    # See https://gitlab.kitware.com/cmake/cmake/-/issues/22441
+    string(REPLACE "/" "\\\\" ALL_USERS_PROFILE "${ALL_USERS_PROFILE}")
+    set(CPACK_NSIS_INSTALL_ROOT "${ALL_USERS_PROFILE}")
+endif()
+include(CPack)
