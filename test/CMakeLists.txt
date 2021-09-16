@@ -5,6 +5,7 @@ target_link_libraries(h5jpegls_test
         hdf5::hdf5
 	Threads::Threads
         Catch2::Catch2)
+target_compile_features(h5jpegls_test PRIVATE cxx_std_17)
 
 include(CTest)
 include(Catch)
