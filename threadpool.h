@@ -14,7 +14,7 @@
 #include <map>
 #include <chrono>
 
-#ifdef _MSC_VER
+#ifdef _WIN32
 #include <malloc.h>
 inline size_t next_power_of_two(size_t v) {
     // From https://graphics.stanford.edu/~seander/bithacks.html#RoundUpPowerOf2
