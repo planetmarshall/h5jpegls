@@ -91,7 +91,8 @@ jobs:
           conan install . \
             --install-folder build \
             --lockfile conan.lock \
-            --build missing
+            --build missing \
+            --generator virtualrunenv
         shell: bash
       - name: build with cmake
         run: |
