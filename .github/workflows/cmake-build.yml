@@ -84,6 +84,7 @@ jobs:
         dpkg -i $(find package -name *.deb)
     - name: run tests
       run: |
+        apt-get install -y python3-pip
         pip3 install pytest h5py
         pytest test.py
       working-directory: test
@@ -152,17 +153,19 @@ jobs:
       with:
         name: windows-vs2019-package
         path: package
-
+    - name: setup python 3
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.9'
     - name: install windows package
       run: .\h5jpegls-0.2.0-win64.exe /S
       working-directory: package
       shell: cmd
-
     - name: Download and install HDF5 for Windows
       run: |
         wget https://www.hdfgroup.org/package/hdf5-1-12-1-std-win10_64-vs16-zip
         unzip hdf5-1-12-1-std-win10_64-vs16-zip
-
+      shell: bash
     - name: run tests
       run: |
         pip install pytest h5py
