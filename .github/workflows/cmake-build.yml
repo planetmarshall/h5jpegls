@@ -130,8 +130,11 @@ jobs:
         name: windows-vs2019-package
         path: package
 
-    - name: Display structure of downloaded files
-      run: ls -R
-      shell: bash
+    - name: install windows package
+      run: h5jpegls-0.2.0-win64.exe /S
       working-directory: package
 
+    - name: Download and install HDF5 for Windows
+      run: |
+        wget https://www.hdfgroup.org/package/hdf5-1-12-1-std-win10_64-vs16-zip
+        unzip hdf5-1-12-1-std-win10_64-vs16-zip
