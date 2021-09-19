@@ -72,12 +72,21 @@ jobs:
       image: algodynamic/hdf5:latest
       options: '--user=root'
     steps:
-    - uses: actions/download-artifact@v2
+    - name: checkout repository
+      uses: actions/checkout@v2
+    - name: download linux package
+      uses: actions/download-artifact@v2
       with:
         name: linux-gcc11-package
         path: package
-    - run: |
+    - name: install linux package
+      run: |
         dpkg -i $(find package -name *.deb)
+    - name: run tests
+      run: |
+        pip3 install pytest h5py
+        pytest test.py
+      working-directory: test
 
   windows-build:
     strategy:
@@ -153,3 +162,10 @@ jobs:
       run: |
         wget https://www.hdfgroup.org/package/hdf5-1-12-1-std-win10_64-vs16-zip
         unzip hdf5-1-12-1-std-win10_64-vs16-zip
+
+    - name: run tests
+      run: |
+        pip install pytest h5py
+        pytest test.py
+      working-directory: test
+
