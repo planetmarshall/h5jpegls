@@ -121,4 +121,17 @@ jobs:
         with:
           name: windows-${{ matrix.profile }}-package
           path: package/*.exe
+  windows-test:
+    needs: windows-build
+    runs-on: windows-2019
+    steps:
+    - uses: actions/download-artifact@v2
+      with:
+        name: windows-vs-2019-package
+        path: package
+
+    - name: Display structure of downloaded files
+      run: ls -R
+      shell: bash
+      working-directory: package
 
