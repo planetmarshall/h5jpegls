@@ -30,7 +30,7 @@ jobs:
         run: |
           CONAN_ARGS="
             --profile .github/workflows/conan/profiles/${{ matrix.profile }} \
-            --build missing
+            --build
           "
           conan lock create conanfile.py ${CONAN_ARGS} --base --lockfile-out base.lock
           conan lock create conanfile.py ${CONAN_ARGS}
@@ -49,7 +49,7 @@ jobs:
           conan install . \
             --install-folder build \
             --lockfile conan.lock \
-            --build missing
+            --build
       - name: build with cmake
         run: |
           conan build . --build-folder build
@@ -85,9 +85,7 @@ jobs:
     - name: install linux package
       run: |
         PACKAGE_NAME=$(find package -name *.deb)
-        dpkg-deb -c ${PACKAGE_NAME}
         dpkg -i ${PACKAGE_NAME}
-        ls -R /usr/local/hdf5
         SO_FILE=$(find /usr/local/hdf5 -name *.so)
         ldd ${SO_FILE}
     - name: run tests
