@@ -84,7 +84,12 @@ jobs:
         path: package
     - name: install linux package
       run: |
-        dpkg -i $(find package -name *.deb)
+        PACKAGE_NAME=$(find package -name *.deb)
+        dpkg-deb -c ${PACKAGE_NAME}
+        dpkg -i ${PACKAGE_NAME}
+        ls -R /usr/local/hdf5
+        SO_FILE=$(find /usr/local/hdf5 -name *.so)
+        ldd ${SO_FILE}
     - name: run tests
       run: |
         pip install pytest
