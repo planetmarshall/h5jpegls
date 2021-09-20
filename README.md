@@ -8,21 +8,44 @@ This fork builds on that work by adding Windows support and an automated build p
 
 Build
 -----
-1. First build the CharLS library:
+* Install [conan](https://docs.conan.io/en/latest/)
+  ```
+  pip install conan
+  ```
+* Install dependencies
+  ```
+  mkdir build
+  conan install . -if build --build missing
+  ```
+* Build with cmake
+  ```
+  cd build
+  cmake .. -D CMAKE_BUILD_TYPE=Release
+  cmake --build .
+  ```
 
-        git clone https://github.com/team-charls/charls.git
-        cd charls
-        mkdir build && cd build
-        cmake -DBUILD_SHARED_LIBS=ON -DCMAKE_BUILD_TYPE=Release ..
-        make
-
-2. Build the filter:
-
-        cd ../..
-        make
+* Run tests
+  ```
+  cd build
+  export HDF5_PLUGIN_PATH=$(pwd)/plugins
+  ctest --extra-verbose
+  ```
 
 Installation
 ------------
+
+* Build as above and generate a package
+  ```
+  cd build
+  cpack -G DEB .
+  ```
+  Or on Windows
+  ```
+  cpack -G NSIS
+  ```
+  
+* Install the package according to your OS
+  HDF5 finds dynamic plugins in non-default locations by searching the path `HDF5_PLUGIN_PATH`
 
 Troubleshooting
 ---------------
@@ -36,4 +59,4 @@ which means that applications which consume the plugin for encoding must both
 This effectively means that the plugin cannot currently be used with 
 [h5py](https://docs.h5py.org/en/stable/high/dataset.html#custom-compression-filters)
 
-See HDFGroup/hdf5#1009 and h5py/h5py#1966 for more information
+See [HDFGroup/hdf5#1009] and [h5py/h5py#1966] for more information
