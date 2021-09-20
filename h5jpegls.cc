@@ -4,13 +4,10 @@
 #include <string.h>
 #include <stdlib.h>
 #include <assert.h>
-#include <unistd.h>
-#include <malloc.h>
-#include <sys/mman.h>
 #include <iostream>
 #include <vector>
 
-#include "charls.h"
+#include <charls/charls.h>
 
 #include "threadpool.h"
 ThreadPool* filter_pool = nullptr;
@@ -67,10 +64,10 @@ size_t codec_filter(unsigned int flags, size_t cd_nelmts,
         unsigned char* in_buf = (unsigned char*)realloc(*buf, nblocks*length*typesize*2);
         *buf = in_buf;
 
-        uint32_t block_size[subchunks];
-        uint32_t offset[subchunks];
+        std::vector<uint32_t> block_size(subchunks);
+        std::vector<uint32_t> offset(subchunks);
         // Extract header
-        memcpy(block_size, in_buf, subchunks*sizeof(uint32_t));
+        memcpy(block_size.data(), in_buf, subchunks*sizeof(uint32_t));
 
         offset[0] = 0;
         uint32_t coffset = 0;
@@ -79,7 +76,7 @@ size_t codec_filter(unsigned int flags, size_t cd_nelmts,
             offset[block] = coffset;
         }
 
-        unsigned char* tbuf[subchunks];
+        std::vector<unsigned char*> tbuf(subchunks);
         vector< std::future<void> > futures;
         // Make a copy of the compressed buffer. Required because we
         // now realloc in_buf.
@@ -129,8 +126,8 @@ size_t codec_filter(unsigned int flags, size_t cd_nelmts,
 
         unsigned char* in_buf = (unsigned char*)*buf;
 
-        uint32_t block_size[subchunks];
-        unsigned char* local_out[subchunks];
+        std::vector<uint32_t> block_size(subchunks);
+        std::vector<unsigned char*> local_out(subchunks);
 
         vector< std::future<void> > futures;
         for (size_t block=0; block < subchunks; block++) {
@@ -175,7 +172,7 @@ size_t codec_filter(unsigned int flags, size_t cd_nelmts,
             *buf = in_buf;
         }
 
-        memcpy(in_buf, (unsigned char*)block_size, header_size);
+        memcpy(in_buf, (unsigned char*)block_size.data(), header_size);
         size_t offset = header_size;
         for (size_t block=0; block < subchunks; block++) {
             memcpy(in_buf + offset, local_out[block], block_size[block]);
@@ -191,12 +188,11 @@ size_t codec_filter(unsigned int flags, size_t cd_nelmts,
     }
 }
 
-herr_t h5jpegls_set_local(hid_t dcpl, hid_t type, hid_t) {
+herr_t h5jpegls_set_local(hid_t dcpl_id, hid_t type_id, hid_t chunk_space_id) {
     unsigned int flags;
     size_t nelements = 8;
     unsigned int values[] = {0,0,0,0,0,0,0,0};
-
-    herr_t r = H5Pget_filter_by_id(dcpl, H5Z_FILTER_JPEGLS, &flags, &nelements, values, 0, NULL, NULL);
+    herr_t r = H5Pget_filter_by_id(dcpl_id, H5Z_FILTER_JPEGLS, &flags, &nelements, values, 0, NULL, NULL);
 
     if (r < 0) {
         return -1;
@@ -206,7 +202,7 @@ herr_t h5jpegls_set_local(hid_t dcpl, hid_t type, hid_t) {
     // we should extract them here
 
     hsize_t chunkdims[32];
-    int ndims = H5Pget_chunk(dcpl, 32, chunkdims);
+    int ndims = H5Pget_chunk(dcpl_id, 32, chunkdims);
     if (ndims < 0) {
         return -1;
     }
@@ -216,14 +212,14 @@ herr_t h5jpegls_set_local(hid_t dcpl, hid_t type, hid_t) {
     values[0] = chunkdims[ndims-1];
     values[1] = (ndims == 1) ? 1 : chunkdims[ndims-2];
 
-    unsigned int typesize = H5Tget_size(type);
+    unsigned int typesize = H5Tget_size(type_id);
     if (typesize == 0) {
         return -1;
     }
 
-    H5T_class_t classt = H5Tget_class(type);
+    H5T_class_t classt = H5Tget_class(type_id);
     if (classt == H5T_ARRAY) {
-        hid_t super_type = H5Tget_super(type);
+        hid_t super_type = H5Tget_super(type_id);
         typesize = H5Tget_size(super_type);
         H5Tclose(super_type);
     }
@@ -236,7 +232,7 @@ herr_t h5jpegls_set_local(hid_t dcpl, hid_t type, hid_t) {
     }
 
     nelements = 3; // TODO: update if we accept #subchunks
-    r = H5Pmodify_filter(dcpl, H5Z_FILTER_JPEGLS, flags, nelements, values);
+    r = H5Pmodify_filter(dcpl_id, H5Z_FILTER_JPEGLS, flags, nelements, values);
 
     if (r < 0) {
         return -1;
@@ -245,22 +241,27 @@ herr_t h5jpegls_set_local(hid_t dcpl, hid_t type, hid_t) {
     return 1;
 }
 
-const H5Z_class2_t H5Z_JPEGLS[1] = {{
+extern "C" const H5Z_class2_t H5Z_JPEGLS[1] = {{
     H5Z_CLASS_T_VERS,                 /* H5Z_class_t version */
     (H5Z_filter_t)H5Z_FILTER_JPEGLS,         /* Filter id number */
     1,              /* encoder_present flag (set to true) */
     1,              /* decoder_present flag (set to true) */
-    "HDF5 JPEG-LS filter v0.1", /* Filter name for debugging */
+    "HDF5 JPEG-LS filter v0.2.1 <https://github.com/planetmarshall/jpegls-hdf-filter>", /* Filter name for debugging */
     NULL,           /* The "can apply" callback     */
-    (H5Z_set_local_func_t)h5jpegls_set_local,           /* The "set local" callback */
+    (H5Z_set_local_func_t)(h5jpegls_set_local),           /* The "set local" callback */
     (H5Z_func_t)codec_filter,         /* The actual filter function */
 }};
 
-H5PL_type_t H5PLget_plugin_type(void) {return H5PL_TYPE_FILTER; }
-const void *H5PLget_plugin_info(void) {return H5Z_JPEGLS; }
+extern "C" H5PL_type_t H5PLget_plugin_type(void) {
+    return H5PL_TYPE_FILTER; 
+}
+extern "C" const void *H5PLget_plugin_info(void) {
+    return H5Z_JPEGLS;
+}
 
-
+#ifndef _MSC_VER
 __attribute__((destructor)) void destroy_threadpool() {
     delete filter_pool;
 }
+#endif
 

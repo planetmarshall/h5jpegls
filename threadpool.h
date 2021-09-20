@@ -13,6 +13,23 @@
 #include <iostream>
 #include <map>
 #include <chrono>
+
+#ifdef _WIN32
+#include <malloc.h>
+inline size_t next_power_of_two(size_t v) {
+    // From https://graphics.stanford.edu/~seander/bithacks.html#RoundUpPowerOf2
+    v--;
+    v |= v >> 1;
+    v |= v >> 2;
+    v |= v >> 4;
+    v |= v >> 8;
+    v |= v >> 16;
+    v |= v >> 32;
+    return ++v;
+}
+#define aligned_alloc(alignment, size) _aligned_malloc((alignment), next_power_of_two(size))
+#endif
+
 using std::map;
 using std::vector;
 
@@ -45,6 +62,7 @@ public:
         }
         return buffers[ti][buffer_id].data;
     }
+
     
     inline unsigned char* get_global_buffer(int buffer_id, size_t size) {
         std::lock_guard<std::mutex> lock(gb_mutex);
@@ -164,12 +182,6 @@ inline ThreadPool::ThreadPool(size_t threads)
             }
         }    
     });
-    
-    sched_param sch_params;
-    sch_params.sched_priority = sched_get_priority_min(SCHED_IDLE);
-    if (pthread_setschedparam(sleeper.native_handle(), SCHED_IDLE, &sch_params)) {
-        printf("Error while trying to demote sleeper thread\n");
-    }
 }
 
 // add new work item to the pool

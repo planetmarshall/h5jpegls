@@ -1,0 +1,209 @@
+name: cmake-build
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  linux-build:
+    strategy:
+      matrix:
+        image: ['conanio/gcc10-ubuntu16.04:1.40.0', 'conanio/clang12-ubuntu16.04:1.40.0']
+        libcxx: [libstdc++11, libc++]
+        exclude:
+          - image: 'conanio/gcc10-ubuntu16.04:1.40.0'
+            libcxx: libc++
+        include:
+          - image: 'conanio/gcc10-ubuntu16.04:1.40.0'
+            profile: gcc10
+          - image: 'conanio/clang12-ubuntu16.04:1.40.0'
+            libcxx: libc++
+            profile: clang12-libc++
+          - image: 'conanio/clang12-ubuntu16.04:1.40.0'
+            libcxx: libstdc++11
+            profile: clang12-libstdc++
+
+    runs-on: ubuntu-20.04
+    container:
+      image: ${{ matrix.image }}
+      options: '--user=root'
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v2
+      - name: create conan cache keys
+        run: |
+          CONAN_ARGS="
+            --profile .github/workflows/conan/profiles/${{ matrix.profile }} \
+            --build
+          "
+          conan lock create conanfile.py ${CONAN_ARGS} --base --lockfile-out base.lock
+          conan lock create conanfile.py ${CONAN_ARGS}
+      - name: get conan cache
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.conan/data
+            !~/.conan/data/**/conan_sources.tgz
+          key: conan-${{ matrix.profile }}-${{ hashfiles('base.lock') }}-${{ hashFiles('conan.lock') }}
+          restore-keys: |
+            conan-${{ matrix.profile }}-${{ hashfiles('base.lock') }}
+            conan-${{ matrix.profile }}
+      - name: install conan dependencies
+        run: |
+          conan install . \
+            --install-folder build \
+            --lockfile conan.lock \
+            --build
+      - name: build with cmake
+        run: |
+          conan build . --build-folder build
+      - name: run tests
+        run: |
+          cd build
+          export HDF5_PLUGIN_PATH=$(pwd)/plugins
+          ctest --extra-verbose --no-tests=error
+      - name: build package
+        run: |
+          cpack -G DEB -B package --config build/CPackConfig.cmake 
+      - name: upload package
+        uses: actions/upload-artifact@v2
+        with:
+          name: linux-${{ matrix.profile }}-package
+          path: package/*.deb
+  linux-test:
+    needs: linux-build
+    runs-on: ubuntu-20.04
+    container:
+      image: algodynamic/hdf5:latest
+      options: '--user=root'
+    steps:
+    - name: checkout repository
+      uses: actions/checkout@v2
+      with:
+        lfs: true
+    - name: download linux package
+      uses: actions/download-artifact@v2
+      with:
+        name: linux-gcc10-package
+        path: package
+    - name: install linux package
+      run: |
+        PACKAGE_NAME=$(find package -name *.deb)
+        dpkg -i ${PACKAGE_NAME}
+        SO_FILE=$(find /usr/local/hdf5 -name *.so)
+        ldd ${SO_FILE}
+    - name: run tests
+      run: |
+        pip install pytest
+        pytest -rvP test.py
+      working-directory: test
+
+  windows-build:
+    strategy:
+      matrix:
+        profile: [vs2019, vs2019-clang]
+    runs-on: windows-2019
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v2
+      - name: create conan cache keys
+        run: |
+          python -m pip install --upgrade pip
+          pip install --upgrade conan
+          CONAN_ARGS="
+            --profile .github/workflows/conan/profiles/${{ matrix.profile }} \
+            --build missing
+          "
+          conan lock create conanfile.py ${CONAN_ARGS} --base --lockfile-out base.lock
+          conan lock create conanfile.py ${CONAN_ARGS}
+        shell: bash
+      - name: get conan cache
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.conan/data
+            !~/.conan/data/**/conan_sources.tgz
+          key: conan-${{ matrix.profile }}-${{ hashfiles('base.lock') }}-${{ hashFiles('conan.lock') }}
+          restore-keys: |
+            conan-${{ matrix.profile }}-${{ hashfiles('base.lock') }}
+            conan-${{ matrix.profile }}
+      - name: install conan dependencies
+        run: |
+          conan install . \
+            --install-folder build \
+            --lockfile conan.lock \
+            --build missing \
+            --generator virtualrunenv
+        shell: bash
+      - name: build with cmake
+        run: |
+          conan build . --build-folder build
+        shell: bash
+      - name: run tests
+        run: |
+          cd build
+          $build_folder=Get-Location
+          $env:HDF5_PLUGIN_PATH=Join-Path -Path $build_folder -ChildPath plugins
+          .\activate_run.ps1
+          ctest --extra-verbose --no-tests=error
+      - name: build package
+        run: |
+          cat build/CPackConfig.cmake
+          cpack -G NSIS -B package --config build/CPackConfig.cmake
+        shell: bash
+      - name: upload package
+        uses: actions/upload-artifact@v2
+        with:
+          name: windows-${{ matrix.profile }}-package
+          path: package/*.exe
+  windows-test:
+    needs: windows-build
+    runs-on: windows-2019
+    defaults:
+      run:
+        shell: bash
+    steps:
+    - name: checkout repository
+      uses: actions/checkout@v2
+      with:
+        lfs: true
+    - uses: actions/download-artifact@v2
+      with:
+        name: windows-vs2019-package
+        path: package
+    - name: setup python 3
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.9'
+    - name: setup msys
+      uses: msys2/setup-msys2@v2
+      with:
+        install: unzip
+    - name: install windows package
+      run: |
+        .\h5jpegls-0.2.1-win64.exe /S
+      working-directory: package
+      shell: cmd
+    - name: download HDF5 for Windows
+      run: |
+        wget https://support.hdfgroup.org/ftp/HDF5/releases/hdf5-1.12/hdf5-1.12.1/bin/windows/hdf5-1.12.1-Std-win10_64-vs16.zip
+        unzip hdf5-1.12.1-Std-win10_64-vs16.zip
+      shell: msys2 {0}
+    - name: Install HDF5 for Windows
+      run: msiexec /i "hdf\HDF5-1.12.1-win64.msi" /qn
+      shell: cmd
+    - name: update PATH
+      run: |
+        echo "C:/Program Files/HDF_Group/HDF5/1.12.1/bin" >> $GITHUB_PATH
+    - name: Test HDF5 install
+      run: |
+        h5dump --version
+    - name: run tests
+      run: |
+        pip install pytest h5py
+        pytest -vrP test.py
+      working-directory: test
