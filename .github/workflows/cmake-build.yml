@@ -148,6 +148,9 @@ jobs:
   windows-test:
     needs: windows-build
     runs-on: windows-2019
+    defaults:
+      run:
+        shell: bash
     steps:
     - uses: actions/download-artifact@v2
       with:
@@ -157,18 +160,23 @@ jobs:
       uses: actions/setup-python@v2
       with:
         python-version: '3.9'
+    - name: setup msys
+      uses: msys2/setup-msys2@v2
     - name: install windows package
-      run: .\h5jpegls-0.2.0-win64.exe /S
+      run: |
+        .\h5jpegls-0.2.0-win64.exe /S
+        dir %ALLUSERSPROFILE%
+        dir %ALLUSERSPROFILE%\hdf5\lib\plugin
       working-directory: package
       shell: cmd
-    - name: Download and install HDF5 for Windows
+    - name: Download HDF5 for Windows
       run: |
         wget https://www.hdfgroup.org/package/hdf5-1-12-1-std-win10_64-vs16-zip
         unzip hdf5-1-12-1-std-win10_64-vs16-zip
-      shell: bash
+        ls -R .
+      shell: msys2 {0}
     - name: run tests
       run: |
         pip install pytest h5py
         pytest test.py
       working-directory: test
-
