@@ -186,7 +186,7 @@ jobs:
         install: unzip
     - name: install windows package
       run: |
-        .\h5jpegls-0.2.1-win64.exe /S
+        .\h5jpegls-1.0.0-win64.exe /S
       working-directory: package
       shell: cmd
     - name: download HDF5 for Windows

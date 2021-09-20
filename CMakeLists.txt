@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.18)
 project(h5jpegls 
-    VERSION 0.2.1
+    VERSION 1.0.0
     HOMEPAGE_URL https://github.com/planetmarshall/jpegls-hdf-filter
     LANGUAGES CXX)
 
