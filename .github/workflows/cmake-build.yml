@@ -4,14 +4,14 @@ jobs:
   linux-build:
     strategy:
       matrix:
-        image: ['conanio/gcc11-ubuntu16.04:1.40.0', 'conanio/clang12-ubuntu16.04:1.40.0']
+        image: ['conanio/gcc10-ubuntu16.04:1.40.0', 'conanio/clang12-ubuntu16.04:1.40.0']
         libcxx: [libstdc++11, libc++]
         exclude:
-          - image: 'conanio/gcc11-ubuntu16.04:1.40.0'
+          - image: 'conanio/gcc10-ubuntu16.04:1.40.0'
             libcxx: libc++
         include:
-          - image: 'conanio/gcc11-ubuntu16.04:1.40.0'
-            profile: gcc11
+          - image: 'conanio/gcc10-ubuntu16.04:1.40.0'
+            profile: gcc10
           - image: 'conanio/clang12-ubuntu16.04:1.40.0'
             libcxx: libc++
             profile: clang12-libc++
@@ -80,7 +80,7 @@ jobs:
     - name: download linux package
       uses: actions/download-artifact@v2
       with:
-        name: linux-gcc11-package
+        name: linux-gcc10-package
         path: package
     - name: install linux package
       run: |
