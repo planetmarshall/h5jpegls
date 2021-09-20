@@ -146,7 +146,8 @@ jobs:
           ctest --extra-verbose --no-tests=error
       - name: build package
         run: |
-          cpack -G NSIS -B package --config build/CPackConfig.cmake 
+          cat build/CPackConfig.cmake
+          cpack -G NSIS -B package --config build/CPackConfig.cmake
         shell: bash
       - name: upload package
         uses: actions/upload-artifact@v2
