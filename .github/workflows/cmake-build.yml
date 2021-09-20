@@ -36,9 +36,10 @@ jobs:
         uses: actions/checkout@v2
       - name: create conan cache keys
         run: |
+          conan config install .github/workflows/conan
           CONAN_ARGS="
-            --profile .github/workflows/conan/profiles/${{ matrix.profile }} \
-            --build
+            --profile ${{ matrix.profile }} \
+            --build missing
           "
           conan lock create conanfile.py ${CONAN_ARGS} --base --lockfile-out base.lock
           conan lock create conanfile.py ${CONAN_ARGS}
@@ -57,7 +58,7 @@ jobs:
           conan install . \
             --install-folder build \
             --lockfile conan.lock \
-            --build
+            --build missing
       - name: build with cmake
         run: |
           conan build . --build-folder build
@@ -185,7 +186,7 @@ jobs:
         install: unzip
     - name: install windows package
       run: |
-        .\h5jpegls-0.2.1-win64.exe /S
+        .\h5jpegls-1.0.0-win64.exe /S
       working-directory: package
       shell: cmd
     - name: download HDF5 for Windows

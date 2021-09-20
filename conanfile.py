@@ -3,7 +3,7 @@ from conans import ConanFile, CMake, tools
 
 class H5jpeglsConan(ConanFile):
     name = "h5jpegls"
-    version = "0.2.1"
+    version = "1.0.0"
     license = "Apache-2.0"
     author = "Andrew Marshall <planetmarshalluk@gmail.com>"
     url = "https://github.com/planetmarshall/jpegls-hdf-filter"
