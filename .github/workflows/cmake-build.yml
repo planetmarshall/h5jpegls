@@ -181,11 +181,15 @@ jobs:
         unzip hdf5-1.12.1-Std-win10_64-vs16.zip
       shell: msys2 {0}
     - name: Install HDF5 for Windows
-      run: msiexec /i "hdf\HDF5-1.12.1-win64.msi" /qn /l*v package.log
+      run: msiexec /i "hdf\HDF5-1.12.1-win64.msi" /qn
       shell: cmd
+    - name: Update PATH
+      run: |
+        echo "C:/Program\ Files/HDF_Group/HDF5/1.12.1/bin" >> $GITHUB_PATH
     - name: Test HDF5 install
       run: |
-        cat package.log
+        echo $PATH
+        echo $GITHUB_PATH
         h5dump --version
     - name: run tests
       run: |
