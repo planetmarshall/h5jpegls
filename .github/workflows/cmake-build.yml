@@ -162,9 +162,7 @@ jobs:
     - name: setup msys
       uses: msys2/setup-msys2@v2
       with:
-        update: true
-        install: >-
-          unzip
+        install: unzip
     - name: install windows package
       run: |
         .\h5jpegls-0.2.0-win64.exe /S
@@ -172,10 +170,14 @@ jobs:
       shell: cmd
     - name: Download HDF5 for Windows
       run: |
-        wget https://www.hdfgroup.org/package/hdf5-1-12-1-std-win10_64-vs16-zip
-        unzip hdf5-1-12-1-std-win10_64-vs16-zip
-        ls -R .
+        wget https://support.hdfgroup.org/ftp/HDF5/releases/hdf5-1.12/hdf5-1.12.1/bin/windows/hdf5-1.12.1-Std-win10_64-vs16.zip
+        unzip hdf5-1.12.1-Std-win10_64-vs16.zip
       shell: msys2 {0}
+    - name: Install HDF5 for Windows
+      run: msiexec /i "hdf\HDF5-1.12.1-win64.msi" /qn
+      shell: cmd
+    - name: Test HDF5 install
+      run: h5dump --version
     - name: run tests
       run: |
         pip install pytest h5py
