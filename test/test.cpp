@@ -18,6 +18,21 @@ TEST_CASE("plugin is available", "[plugin]") {
     REQUIRE(H5Zfilter_avail(jpegls_filter_id) != 0);
 }
 
+SCENARIO("data in an hdf5 file can be compressed", "[plugin]") {
+    GIVEN("A 2D array of 16bit integers in a checkerboard pattern") {
+        WHEN("The array is written to a dataset") {
+            THEN("The storage size of the dataset is less than that of the array") {
+
+            }
+        }
+        AND_WHEN("The dataset is read back") {
+            THEN("The data is identical to the original") {
+
+            }
+        }
+    }
+}
+
 TEST_CASE("round trip a compressed dataset", "[h5jpegls]") {
     std::cout << std::getenv("HDF5_PLUGIN_PATH") << std::endl;
     // Adapted from https://github.com/HDFGroup/hdf5_plugins/blob/master/BZIP2/example/h5ex_d_bzip2.c
