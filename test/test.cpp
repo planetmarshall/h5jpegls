@@ -14,6 +14,10 @@
 #define CHUNK1 32
 const int jpegls_filter_id = 32012;
 
+TEST_CASE("plugin is available", "[plugin]") {
+    REQUIRE(H5Zfilter_avail(jpegls_filter_id) != 0);
+}
+
 TEST_CASE("round trip a compressed dataset", "[h5jpegls]") {
     std::cout << std::getenv("HDF5_PLUGIN_PATH") << std::endl;
     // Adapted from https://github.com/HDFGroup/hdf5_plugins/blob/master/BZIP2/example/h5ex_d_bzip2.c
