@@ -1,7 +1,6 @@
 import h5py
 import numpy as np
 
-import subprocess
 from subprocess import check_output
 from tempfile import TemporaryDirectory
 import os.path
@@ -39,6 +38,3 @@ def test_compress_greyscale_8():
     print(f"compression ratio: {compression_ratio:.3f}:1")
     assert compression_ratio > 1.5
     assert np.count_nonzero(test8_raw - test8_compressed) == 0
-
-
-
