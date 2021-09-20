@@ -1,8 +1,11 @@
 JPEG-LS HDF5 Filter
 ===================
 
+![CI Build](https://github.com/planetmarshall/jpegls-hdf-filter/actions/workflows/cmake-build.yml/badge.svg)
+
+
 The JPEG-LS HDF5 filter allows the multi-threaded compression of HDF5 datasets using the JPEG-LS codec. It is based
-on original work by [Frans van den Bergh](fvdbergh@csir.co.za) and [Derick Swanepoel](dswanepoel@gmail.com)
+on original work by _Frans van den Bergh_ and _Derick Swanepoel_
 
 This fork builds on that work by adding Windows support and an automated build process. This version has
 been created to serve as a baseline for future development
