@@ -189,6 +189,7 @@ jobs:
         h5dump --version
     - name: run tests
       run: |
+        head data/test.h5
         pip install pytest h5py
         pytest test.py
       working-directory: test
