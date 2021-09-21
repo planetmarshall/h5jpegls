@@ -1,9 +1,13 @@
 add_executable(h5jpegls_test test.cpp)
 add_dependencies(h5jpegls_test h5jpegls)
+
+find_package(Eigen3 REQUIRED)
+
 target_link_libraries(h5jpegls_test
-        PRIVATE
+    PRIVATE
+		Eigen3::Eigen
         hdf5::hdf5
-	Threads::Threads
+		Threads::Threads
         Catch2::Catch2)
 target_compile_features(h5jpegls_test PRIVATE cxx_std_17)
 
