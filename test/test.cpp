@@ -27,7 +27,7 @@ namespace {
     template<typename Scalar>
     Mx<Scalar> test_data(Eigen::Index rows, Eigen::Index cols) {
         std::mt19937 prg{0};
-        std::uniform_int_distribution<Scalar> dist(std::numeric_limits<Scalar>::lowest(), std::numeric_limits<Scalar>::max());
+        std::uniform_int_distribution<int64_t> dist(std::numeric_limits<Scalar>::lowest(), std::numeric_limits<Scalar>::max());
         constexpr Eigen::Index blocks_per_row = 4;
         constexpr Eigen::Index blocks_per_column = 4;
         Eigen::Index row_block_size = rows / blocks_per_row;
@@ -97,7 +97,7 @@ TEMPLATE_TEST_CASE("Scenario: valid data can written to an HDF5 file, compressed
     hid_t dcpl_id = -1;
     herr_t status;
     constexpr auto dataset_name = "test";
-    auto file_name = temp_file();
+    auto file_name = temp_file().string();
     file_id = H5Fcreate(file_name.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
     REQUIRE(file_id >=0);
     GIVEN("A 2D array of 16bit signed integers") {
