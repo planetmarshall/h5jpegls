@@ -71,7 +71,25 @@ TEST_CASE("plugin is available", "[plugin]") {
     REQUIRE(H5Zfilter_avail(jpegls_filter_id) != 0);
 }
 
-SCENARIO("data can written to an HDF5 file, compressed, decompressed and read back", "[plugin]") {
+template<typename T>
+struct hdf5_type_traits {
+    static hid_t type() { throw; }
+};
+
+template<>
+struct hdf5_type_traits<uint8_t> {
+    static hid_t type() { return H5T_STD_U8LE; } };
+
+template<>
+struct hdf5_type_traits<int8_t> { static hid_t type() { return H5T_STD_I8LE; } };
+
+template<>
+struct hdf5_type_traits<uint16_t> { static hid_t type() { return H5T_STD_U16LE; } };
+
+template<>
+struct hdf5_type_traits<int16_t> { static hid_t type() { return H5T_STD_I16LE; } };
+
+TEMPLATE_TEST_CASE("Scenario: valid data can written to an HDF5 file, compressed, decompressed and read back", "[plugin][template]", uint8_t, int8_t, uint16_t, int16_t) {
     // Adapted from https://github.com/HDFGroup/hdf5_plugins/blob/master/BZIP2/example/h5ex_d_bzip2.c
     hid_t file_id = -1;
     hid_t space_id = -1;
@@ -82,10 +100,10 @@ SCENARIO("data can written to an HDF5 file, compressed, decompressed and read ba
     auto file_name = temp_file();
     file_id = H5Fcreate(file_name.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
     REQUIRE(file_id >=0);
-    GIVEN("A 2D array of 16bit integers") {
+    GIVEN("A 2D array of 16bit signed integers") {
         constexpr hsize_t rows = 943;
         constexpr hsize_t cols = 721;
-        auto data = test_data<int16_t>(rows, cols);
+        auto data = test_data<TestType>(rows, cols);
         std::array<hsize_t, 2> dimensions{rows, cols};
         space_id = H5Screate_simple(dimensions.size(), dimensions.data(), NULL);
         REQUIRE(space_id >= 0);
@@ -97,16 +115,16 @@ SCENARIO("data can written to an HDF5 file, compressed, decompressed and read ba
             std::array<hsize_t, 2> chunk{rows, cols};
             status = H5Pset_chunk(dcpl_id, chunk.size(), chunk.data());
             REQUIRE(status >= 0);
-            dset_id = H5Dcreate(file_id, dataset_name, H5T_STD_I16LE, space_id, H5P_DEFAULT, dcpl_id, H5P_DEFAULT);
+            dset_id = H5Dcreate(file_id, dataset_name, hdf5_type_traits<TestType>::type(), space_id, H5P_DEFAULT, dcpl_id, H5P_DEFAULT);
             REQUIRE(dset_id >= 0);
-            status = H5Dwrite(dset_id, H5T_STD_I16LE, H5S_ALL, H5S_ALL, H5P_DEFAULT, data.data());
+            status = H5Dwrite(dset_id, hdf5_type_traits<TestType>::type(), H5S_ALL, H5S_ALL, H5P_DEFAULT, data.data());
             REQUIRE(status >= 0);
-            auto uncompressed_size = data.size() * sizeof(int16_t);
+            auto uncompressed_size = data.size() * sizeof(TestType);
             THEN("The storage size of the dataset is less than that of the array") {
                 auto storage_size = H5Dget_storage_size(dset_id);
                 REQUIRE(storage_size > 0);
                 auto compression_ratio = static_cast<double>(uncompressed_size) / static_cast<double>(storage_size);
-                REQUIRE(compression_ratio > 64);
+                REQUIRE(compression_ratio > 50);
             }
             H5Dclose(dset_id);
             dset_id = -1;
@@ -132,25 +150,25 @@ SCENARIO("data can written to an HDF5 file, compressed, decompressed and read ba
                     std::cout << "Filter info: " << filter_name << "\n";
 
                     AND_THEN("The data is identical to the original") {
-                        Mx<int16_t> actual_data(rows, cols);
-                        status = H5Dread(dset_id, H5T_STD_I16LE, H5S_ALL, H5S_ALL, H5P_DEFAULT, actual_data.data());
+                        Mx<TestType> actual_data(rows, cols);
+                        status = H5Dread(dset_id, hdf5_type_traits<TestType>::type(), H5S_ALL, H5S_ALL, H5P_DEFAULT, actual_data.data());
                         REQUIRE(status >= 0);
                         REQUIRE(!(data - actual_data).any());
                     }
                 }
             }
         }
-    }
-    if (dcpl_id >= 0) {
-        H5Pclose(dcpl_id);
-    }
-    if (dset_id >= 0) {
-        H5Dclose(dset_id);
-    }
-    if (space_id >= 0) {
-        H5Sclose(space_id);
-    }
-    if (file_id >= 0) {
-        H5Fclose(file_id);
+        if (dcpl_id >= 0) {
+            H5Pclose(dcpl_id);
+        }
+        if (dset_id >= 0) {
+            H5Dclose(dset_id);
+        }
+        if (space_id >= 0) {
+            H5Sclose(space_id);
+        }
+        if (file_id >= 0) {
+            H5Fclose(file_id);
+        }
     }
 }
