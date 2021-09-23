@@ -6,8 +6,7 @@
 #include <vector>
 #include <cassert>
 #include <cstdio>
-
-using std::vector;
+#include <cstring>
 
 // Temporary unofficial filter ID
 const H5Z_filter_t H5Z_FILTER_JPEGLS = 32012;
