@@ -128,9 +128,9 @@ extern "C" const H5Z_class2_t H5Z_JPEGLS[1] = {{
     (H5Z_func_t)codec_filter,         /* The actual filter function */
 }};
 
-H5PL_type_t H5PLget_plugin_type(void) {
+extern "C" H5PL_type_t H5PLget_plugin_type(void) {
     return H5PL_TYPE_FILTER; 
 }
-const void *H5PLget_plugin_info(void) {
+extern "C" const void *H5PLget_plugin_info(void) {
     return H5Z_JPEGLS;
 }

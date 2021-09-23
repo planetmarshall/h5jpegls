@@ -10,6 +10,13 @@ if (EXISTS "${CMAKE_BINARY_DIR}/conanbuildinfo.cmake")
     list(PREPEND CMAKE_MODULE_PATH ${CMAKE_BINARY_DIR})
 endif()
 
+if (MSVC)
+    add_compile_options(/W4 /permissive-)
+else()
+    add_compile_options(-Wall -Wpedantic -Wextra)
+    add_compile_options("$<$<CXX_COMPILER_ID:Clang,AppleClang>:-Wconversion;-Wconditional-uninitialized>")
+endif()
+
 find_package(Threads REQUIRED)
 find_package(charls REQUIRED)
 find_package(HDF5 REQUIRED COMPONENTS C)
