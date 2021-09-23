@@ -125,7 +125,7 @@ TEMPLATE_TEST_CASE("Scenario: valid data can written to an HDF5 file, compressed
                 REQUIRE(storage_size > 0);
                 auto compression_ratio = static_cast<double>(uncompressed_size) / static_cast<double>(storage_size);
                 std::cout << "Compression ratio: " << compression_ratio << "\n";
-                REQUIRE(compression_ratio > 50);
+                REQUIRE(compression_ratio > 100);
             }
             H5Dclose(dset_id);
             dset_id = -1;

@@ -31,161 +31,57 @@ int get_threads() {
     return threads;
 }
 
+size_t decode(void **buffer, size_t *buffer_size, size_t data_size) {
+    charls::jpegls_decoder decoder;
+    decoder.source(*buffer, data_size);
+    decoder.read_header();
+    auto required_bytes = decoder.destination_size();
+    std::vector<uint8_t> decoding_buffer(required_bytes);
+    decoder.decode(decoding_buffer);
+    if (*buffer_size < required_bytes) {
+        *buffer = realloc(*buffer, required_bytes);
+        *buffer_size = required_bytes;
+    }
+    memcpy(*buffer, decoding_buffer.data(), required_bytes);
+    return required_bytes;
+}
+
+size_t encode(void **buffer, size_t *buffer_size, size_t data_size, int bytes_per_element, uint32_t chunk_width, uint32_t chunk_height) {
+    charls::jpegls_encoder encoder;
+    charls::frame_info frame{
+        .width = chunk_width,
+        .height = chunk_height,
+        .bits_per_sample = bytes_per_element * 8,
+        .component_count = 1,
+    };
+    try {
+        encoder.frame_info(frame);
+        std::vector<uint8_t> encoding_buffer(*buffer_size);
+        encoder.destination(encoding_buffer);
+        auto num_encoded_bytes = encoder.encode(*buffer, data_size);
+        assert(num_encoded_bytes < *buffer_size);
+        *buffer_size = num_encoded_bytes;
+        memcpy(*buffer, encoding_buffer.data(), num_encoded_bytes);
+        return num_encoded_bytes;
+    }
+    catch(const std::exception & ex) {
+        fprintf(stderr, ex.what());
+        return 0;
+    }
+}
+
 size_t codec_filter(unsigned int flags, size_t cd_nelmts,
-    const unsigned int cd_values[], size_t nbytes, size_t *buf_size, void **buf) {
+                    const unsigned int cd_values[], size_t nbytes, size_t *buf_size, void **buf) {
 
-    int threads = get_threads();
-    if (filter_pool == nullptr || filter_pool->get_threads() != threads) {
-        delete filter_pool;
-        filter_pool = new ThreadPool(threads);
-    }
-    filter_pool->lock_buffers();
-
-    int length = 1;
-    size_t nblocks = 32; // number of time series if encoding time-major chunks
-    int typesize = 1;
-    if (cd_nelmts > 2 && cd_values[0] > 0) {
-        length   = cd_values[0];
-        nblocks  = cd_values[1];
-        typesize = cd_values[2];
-    } else {
-        printf("Error: Incorrect number of filter parameters specified. Aborting.\n");
-        return -1;
-    }
-    char errMsg[256];
-
-    size_t subchunks = std::min(size_t(24), nblocks);
-    const size_t lblocks = nblocks / subchunks;
-    const size_t header_size = 4*subchunks;
-    const size_t remainder = nblocks - lblocks * subchunks;
+    int width = cd_values[0];
+    int height = cd_values[1];
+    int typesize = cd_values[2];
 
     if (flags & H5Z_FLAG_REVERSE) {
-        /* Input */
-        unsigned char* in_buf = (unsigned char*)realloc(*buf, nblocks*length*typesize*2);
-        *buf = in_buf;
-
-        std::vector<uint32_t> block_size(subchunks);
-        std::vector<uint32_t> offset(subchunks);
-        // Extract header
-        memcpy(block_size.data(), in_buf, subchunks*sizeof(uint32_t));
-
-        offset[0] = 0;
-        uint32_t coffset = 0;
-        for (size_t block=1; block < subchunks; block++) {
-            coffset += block_size[block-1];
-            offset[block] = coffset;
-        }
-
-        std::vector<unsigned char*> tbuf(subchunks);
-        vector< std::future<void> > futures;
-        // Make a copy of the compressed buffer. Required because we
-        // now realloc in_buf.
-        for (size_t block=0; block < subchunks; block++) {
-            futures.emplace_back(
-                filter_pool->enqueue( [&,block] {
-                    tbuf[block] = filter_pool->get_global_buffer(block, length*nblocks*typesize + 512);
-                    memcpy(tbuf[block], in_buf+header_size+offset[block], block_size[block]);
-                })
-            );
-        }
-        // must wait for copies to complete, otherwise having
-        // threads > subchunks could lead to a decompressor overwriting in_buf
-        for (size_t i=0; i < futures.size(); i++) {
-            futures[i].wait();
-        }
-
-        for (size_t block=0; block < subchunks; block++) {
-            futures.emplace_back(
-                filter_pool->enqueue( [&,block] {
-                    size_t own_blocks = (block < remainder ? 1 : 0) + lblocks;
-                    CharlsApiResultType ret = JpegLsDecode(
-                        in_buf + typesize*length* ( (block < remainder) ? block*(lblocks+1) : (remainder*(lblocks+1) + (block-remainder)*lblocks) ),
-                        typesize*length*own_blocks,
-                        tbuf[block],
-                        block_size[block],
-                        nullptr,
-                        errMsg
-                    );
-                    if (ret != CharlsApiResultType::OK) {
-                        fprintf(stderr, "JPEG-LS error %d: %s\n", ret, errMsg);
-                    }
-                })
-            );
-        }
-        for (size_t i=0; i < futures.size(); i++) {
-            futures[i].wait();
-        }
-
-        *buf_size = nblocks*length*typesize;
-
-        filter_pool->unlock_buffers();
-        return *buf_size;
-
-    } else {
-        /* Output */
-
-        unsigned char* in_buf = (unsigned char*)*buf;
-
-        std::vector<uint32_t> block_size(subchunks);
-        std::vector<unsigned char*> local_out(subchunks);
-
-        vector< std::future<void> > futures;
-        for (size_t block=0; block < subchunks; block++) {
-            size_t own_blocks = (block < remainder ? 1 : 0) + lblocks;
-            local_out[block] = filter_pool->get_global_buffer(block, own_blocks*length*typesize + 8192);
-
-            futures.emplace_back(
-                filter_pool->enqueue( [&,block,own_blocks] {
-                    JlsParameters params = JlsParameters();
-                    params.width = length;
-                    params.height = own_blocks;
-                    params.bitsPerSample = typesize * 8;
-                    params.components = 1;
-                    size_t csize;
-                    CharlsApiResultType ret = JpegLsEncode(
-                        local_out[block],
-                        own_blocks*length*typesize + 8192,
-                        &csize,
-                        in_buf + typesize*length* ( (block < remainder) ? block*(lblocks+1) : (remainder*(lblocks+1) + (block-remainder)*lblocks) ),
-                        own_blocks*length*typesize,
-                        &params,
-                        errMsg
-                    );
-                    if (ret != CharlsApiResultType::OK) {
-                        fprintf(stderr, "JPEG-LS error: %s\n", errMsg);
-                    }
-                    block_size[block] = csize;
-                })
-            );
-        }
-        for (size_t i=0; i < futures.size(); i++) {
-            futures[i].wait();
-        }
-
-        size_t compr_size = header_size;
-        for (size_t block=0; block < subchunks; block++) {
-            compr_size += block_size[block];
-        }
-
-        if (compr_size > nbytes) {
-            in_buf = (unsigned char*)realloc(*buf, compr_size);
-            *buf = in_buf;
-        }
-
-        memcpy(in_buf, (unsigned char*)block_size.data(), header_size);
-        size_t offset = header_size;
-        for (size_t block=0; block < subchunks; block++) {
-            memcpy(in_buf + offset, local_out[block], block_size[block]);
-            offset += block_size[block];
-        }
-
-        size_t compressed_size = offset;
-        *buf_size = compressed_size;
-
-        filter_pool->unlock_buffers();
-        return compressed_size;
-
+        return decode(buf, buf_size, nbytes);
     }
+
+    return encode(buf, buf_size, nbytes, typesize, width, height);
 }
 
 herr_t h5jpegls_set_local(hid_t dcpl_id, hid_t type_id, hid_t chunk_space_id) {
