@@ -1,5 +1,5 @@
 add_library(h5jpegls MODULE h5jpegls.cpp)
-target_compile_features(h5jpegls PUBLIC cxx_std_17)
+target_compile_features(h5jpegls PRIVATE cxx_std_20)
 target_link_libraries(
         h5jpegls
    PRIVATE
