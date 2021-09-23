@@ -4,7 +4,7 @@ project(h5jpegls
     HOMEPAGE_URL https://github.com/planetmarshall/jpegls-hdf-filter
     LANGUAGES CXX)
 
-add_library(h5jpegls MODULE h5jpegls.cc threadpool.h)
+add_library(h5jpegls MODULE h5jpegls.cc)
 
 if (EXISTS "${CMAKE_BINARY_DIR}/conanbuildinfo.cmake")
     include(${CMAKE_BINARY_DIR}/conanbuildinfo.cmake)

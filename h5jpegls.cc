@@ -1,35 +1,16 @@
 #include <H5PLextern.h>
 #include <H5Zpublic.h>
 #include <hdf5.h>
-#include <string.h>
-#include <stdlib.h>
-#include <assert.h>
-#include <iostream>
-#include <vector>
-
 #include <charls/charls.h>
 
-#include "threadpool.h"
-ThreadPool* filter_pool = nullptr;
-
-#include <future>
+#include <vector>
+#include <cassert>
+#include <cstdio>
 
 using std::vector;
 
 // Temporary unofficial filter ID
 const H5Z_filter_t H5Z_FILTER_JPEGLS = 32012;
-
-int get_threads() {
-    int threads = 0;
-    char* envvar = getenv("HDF5_FILTER_THREADS");
-    if (envvar != NULL) {
-        threads = atoi(envvar);
-    }
-    if (threads <= 0) {
-        threads = std::min(std::thread::hardware_concurrency(), 8u);
-    }
-    return threads;
-}
 
 size_t decode(void **buffer, size_t *buffer_size, size_t data_size) {
     charls::jpegls_decoder decoder;
@@ -52,7 +33,7 @@ size_t encode(void **buffer, size_t *buffer_size, size_t data_size, int bytes_pe
         .width = chunk_width,
         .height = chunk_height,
         .bits_per_sample = bytes_per_element * 8,
-        .component_count = 1,
+        .component_count = 1
     };
     try {
         encoder.frame_info(frame);
@@ -65,7 +46,7 @@ size_t encode(void **buffer, size_t *buffer_size, size_t data_size, int bytes_pe
         return num_encoded_bytes;
     }
     catch(const std::exception & ex) {
-        fprintf(stderr, ex.what());
+        fprintf(stderr, "%s", ex.what());
         return 0;
     }
 }
@@ -148,16 +129,9 @@ extern "C" const H5Z_class2_t H5Z_JPEGLS[1] = {{
     (H5Z_func_t)codec_filter,         /* The actual filter function */
 }};
 
-extern "C" H5PL_type_t H5PLget_plugin_type(void) {
+H5PL_type_t H5PLget_plugin_type(void) {
     return H5PL_TYPE_FILTER; 
 }
-extern "C" const void *H5PLget_plugin_info(void) {
+const void *H5PLget_plugin_info(void) {
     return H5Z_JPEGLS;
 }
-
-#ifndef _MSC_VER
-__attribute__((destructor)) void destroy_threadpool() {
-    delete filter_pool;
-}
-#endif
-
