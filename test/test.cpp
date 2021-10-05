@@ -134,9 +134,7 @@ SCENARIO("The filter can only be applied to 2D datasets", "[plugin]") {
                 status = H5Pset_chunk(dcpl_id, chunk.size(), chunk.data());
                 REQUIRE(status >= 0);
                 dset_id = H5Dcreate(file_id, dataset_name, hdf5_type_traits<uint8_t>::type(), space_id, H5P_DEFAULT, dcpl_id, H5P_DEFAULT);
-                REQUIRE(dset_id >= 0);
-                status = H5Dwrite(dset_id, hdf5_type_traits<uint8_t>::type(), H5S_ALL, H5S_ALL, H5P_DEFAULT, data.data());
-                REQUIRE(status < 0);
+                REQUIRE(dset_id < 0);
             }
         }
     }

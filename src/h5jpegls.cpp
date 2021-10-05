@@ -3,6 +3,7 @@
 #include <hdf5.h>
 #include <charls/charls.h>
 
+#include <array>
 #include <vector>
 #include <cassert>
 #include <cstdio>
@@ -42,6 +43,16 @@ size_t encode(void **buffer, size_t *buffer_size, size_t data_size, int bytes_pe
     *buffer_size = num_encoded_bytes;
     memcpy(*buffer, encoding_buffer.data(), num_encoded_bytes);
     return num_encoded_bytes;
+}
+
+htri_t can_apply_filter(hid_t dcpl_id, hid_t type_id, hid_t space_id) {
+    constexpr hsize_t max_rank = 32;
+    std::array<hsize_t, max_rank> chunk_dimensions{};
+    int rank = H5Pget_chunk(dcpl_id, 32, chunk_dimensions.data());
+    if (rank != 2) {
+        return 0;
+    }
+    return 1;
 }
 
 size_t codec_filter(unsigned int flags, size_t cd_nelmts,
@@ -124,9 +135,9 @@ extern "C" const H5Z_class2_t H5Z_JPEGLS[1] = {{
     1,              /* encoder_present flag (set to true) */
     1,              /* decoder_present flag (set to true) */
     "HDF5 JPEG-LS filter v1.0.0 <https://github.com/planetmarshall/jpegls-hdf-filter>", /* Filter name for debugging */
-    NULL,           /* The "can apply" callback     */
-    (H5Z_set_local_func_t)(h5jpegls_set_local),           /* The "set local" callback */
-    (H5Z_func_t)codec_filter,         /* The actual filter function */
+    can_apply_filter,           /* The "can apply" callback     */
+    h5jpegls_set_local,           /* The "set local" callback */
+    codec_filter,         /* The actual filter function */
 }};
 
 extern "C" H5PL_type_t H5PLget_plugin_type(void) {
