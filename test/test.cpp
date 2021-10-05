@@ -89,6 +89,60 @@ struct hdf5_type_traits<uint16_t> { static hid_t type() { return H5T_STD_U16LE; 
 template<>
 struct hdf5_type_traits<int16_t> { static hid_t type() { return H5T_STD_I16LE; } };
 
+void cleanup(hid_t &file_id, hid_t &space_id, hid_t &dset_id, hid_t &dcpl_id) {
+    if (dcpl_id >= 0) {
+        H5Pclose(dcpl_id);
+        dcpl_id = -1;
+    }
+    if (dset_id >= 0) {
+        H5Dclose(dset_id);
+        dset_id = -1;
+    }
+    if (space_id >= 0) {
+        H5Sclose(space_id);
+        space_id = -1;
+    }
+    if (file_id >= 0) {
+        H5Fclose(file_id);
+        file_id = -1;
+    }
+}
+
+SCENARIO("The filter can only be applied to 2D datasets", "[plugin]") {
+    auto file_name = temp_file().string();
+    hid_t file_id = -1;
+    hid_t space_id = -1;
+    hid_t dset_id = -1;
+    hid_t dcpl_id = -1;
+    constexpr auto dataset_name = "test";
+    herr_t status;
+    file_id = H5Fcreate(file_name.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+    const hsize_t dim = 4;
+    const hsize_t rank = 3;
+    std::array<uint8_t, dim * dim * dim> data{};
+    GIVEN("A 3D array of integers") {
+        std::array<hsize_t, rank> dimensions{dim, dim, dim};
+        space_id = H5Screate_simple(dimensions.size(), dimensions.data(), NULL);
+        REQUIRE(space_id >= 0);
+        WHEN("The array is written to a dataset") {
+            THEN("The filter cannot be applied") {
+                dcpl_id = H5Pcreate(H5P_DATASET_CREATE);
+                REQUIRE(dcpl_id >= 0);
+                status = H5Pset_filter(dcpl_id, jpegls_filter_id, H5Z_FLAG_MANDATORY, 0, NULL);
+                REQUIRE(status >= 0);
+                std::array<hsize_t, rank> chunk{dim, dim, dim};
+                status = H5Pset_chunk(dcpl_id, chunk.size(), chunk.data());
+                REQUIRE(status >= 0);
+                dset_id = H5Dcreate(file_id, dataset_name, hdf5_type_traits<uint8_t>::type(), space_id, H5P_DEFAULT, dcpl_id, H5P_DEFAULT);
+                REQUIRE(dset_id >= 0);
+                status = H5Dwrite(dset_id, hdf5_type_traits<uint8_t>::type(), H5S_ALL, H5S_ALL, H5P_DEFAULT, data.data());
+                REQUIRE(status < 0);
+            }
+        }
+    }
+    cleanup(file_id, space_id, dset_id, dcpl_id);
+}
+
 TEMPLATE_TEST_CASE("Scenario: valid data can written to an HDF5 file, compressed, decompressed and read back", "[plugin][template]", uint8_t, int8_t, uint16_t, int16_t) {
     // Adapted from https://github.com/HDFGroup/hdf5_plugins/blob/master/BZIP2/example/h5ex_d_bzip2.c
     hid_t file_id = -1;
@@ -100,7 +154,7 @@ TEMPLATE_TEST_CASE("Scenario: valid data can written to an HDF5 file, compressed
     auto file_name = temp_file().string();
     file_id = H5Fcreate(file_name.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
     REQUIRE(file_id >=0);
-    GIVEN("A 2D array of 16bit signed integers") {
+    GIVEN("A 2D array of integers") {
         constexpr hsize_t rows = 943;
         constexpr hsize_t cols = 721;
         auto data = test_data<TestType>(rows, cols);
@@ -127,14 +181,7 @@ TEMPLATE_TEST_CASE("Scenario: valid data can written to an HDF5 file, compressed
                 std::cout << "Compression ratio: " << compression_ratio << "\n";
                 REQUIRE(compression_ratio > 100);
             }
-            H5Dclose(dset_id);
-            dset_id = -1;
-            H5Pclose(dcpl_id);
-            dcpl_id = -1;
-            H5Sclose(space_id);
-            space_id = -1;
-            H5Fclose(file_id);
-            file_id = -1;
+            cleanup(file_id, space_id, dset_id, dcpl_id);
             status = H5close();
             REQUIRE(status >= 0);
 
@@ -159,17 +206,6 @@ TEMPLATE_TEST_CASE("Scenario: valid data can written to an HDF5 file, compressed
                 }
             }
         }
-        if (dcpl_id >= 0) {
-            H5Pclose(dcpl_id);
-        }
-        if (dset_id >= 0) {
-            H5Dclose(dset_id);
-        }
-        if (space_id >= 0) {
-            H5Sclose(space_id);
-        }
-        if (file_id >= 0) {
-            H5Fclose(file_id);
-        }
+        cleanup(file_id, space_id, dset_id, dcpl_id);
     }
 }
