@@ -48,11 +48,17 @@ size_t encode(void **buffer, size_t *buffer_size, size_t data_size, int bytes_pe
 htri_t can_apply_filter(hid_t dcpl_id, hid_t type_id, hid_t space_id) {
     constexpr hsize_t max_rank = 32;
     std::array<hsize_t, max_rank> chunk_dimensions{};
-    int rank = H5Pget_chunk(dcpl_id, 32, chunk_dimensions.data());
+    auto rank = H5Pget_chunk(dcpl_id, 32, chunk_dimensions.data());
     if (rank != 2) {
         return 0;
     }
-    return 1;
+    auto type_class = H5Tget_class(type_id);
+    bool can_filter = type_class == H5T_INTEGER;
+    if (type_class == H5T_ARRAY) {
+        auto base_class = H5Tget_super(type_id);
+        can_filter = base_class == H5T_INTEGER;
+    }
+    return can_filter ? 1 : 0;
 }
 
 size_t codec_filter(unsigned int flags, size_t cd_nelmts,
