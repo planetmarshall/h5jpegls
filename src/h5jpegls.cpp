@@ -34,20 +34,14 @@ size_t encode(void **buffer, size_t *buffer_size, size_t data_size, int bytes_pe
         .bits_per_sample = bytes_per_element * 8,
         .component_count = 1
     };
-    try {
-        encoder.frame_info(frame);
-        std::vector<uint8_t> encoding_buffer(*buffer_size);
-        encoder.destination(encoding_buffer);
-        auto num_encoded_bytes = encoder.encode(*buffer, data_size);
-        assert(num_encoded_bytes < *buffer_size);
-        *buffer_size = num_encoded_bytes;
-        memcpy(*buffer, encoding_buffer.data(), num_encoded_bytes);
-        return num_encoded_bytes;
-    }
-    catch(const std::exception & ex) {
-        fprintf(stderr, "%s", ex.what());
-        return 0;
-    }
+    encoder.frame_info(frame);
+    std::vector<uint8_t> encoding_buffer(*buffer_size);
+    encoder.destination(encoding_buffer);
+    auto num_encoded_bytes = encoder.encode(*buffer, data_size);
+    assert(num_encoded_bytes < *buffer_size);
+    *buffer_size = num_encoded_bytes;
+    memcpy(*buffer, encoding_buffer.data(), num_encoded_bytes);
+    return num_encoded_bytes;
 }
 
 size_t codec_filter(unsigned int flags, size_t cd_nelmts,
@@ -57,11 +51,18 @@ size_t codec_filter(unsigned int flags, size_t cd_nelmts,
     int height = cd_values[1];
     int typesize = cd_values[2];
 
-    if (flags & H5Z_FLAG_REVERSE) {
-        return decode(buf, buf_size, nbytes);
+    try {
+        if (flags & H5Z_FLAG_REVERSE) {
+            return decode(buf, buf_size, nbytes);
+        }
+        return encode(buf, buf_size, nbytes, typesize, width, height);
+    } catch (const std::exception & ex) {
+        fprintf(stderr, ex.what());
+        fprintf(stderr, "\n");
+    } catch (...) {
+        fprintf(stderr, "Unknown error\n");
     }
-
-    return encode(buf, buf_size, nbytes, typesize, width, height);
+    return 0;
 }
 
 herr_t h5jpegls_set_local(hid_t dcpl_id, hid_t type_id, hid_t chunk_space_id) {
