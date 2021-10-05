@@ -57,7 +57,14 @@ htri_t can_apply_filter(hid_t dcpl_id, hid_t type_id, hid_t space_id) {
     if (type_class == H5T_ARRAY) {
         auto base_class = H5Tget_super(type_id);
         can_filter = base_class == H5T_INTEGER;
+        H5Tclose(base_class);
     }
+    if (!can_filter) {
+        return 0;
+    }
+
+    auto type_size_in_bytes = H5Tget_size(type_id);
+    can_filter = type_size_in_bytes <= 2;
     return can_filter ? 1 : 0;
 }
 

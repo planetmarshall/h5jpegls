@@ -73,22 +73,24 @@ TEST_CASE("plugin is available", "[plugin]") {
 
 template<typename T>
 struct hdf5_type_traits { static hid_t type() { throw; } };
-
 template<>
 struct hdf5_type_traits<uint8_t> { static hid_t type() { return H5T_STD_U8LE; } };
-
 template<>
 struct hdf5_type_traits<int8_t> { static hid_t type() { return H5T_STD_I8LE; } };
-
 template<>
 struct hdf5_type_traits<uint16_t> { static hid_t type() { return H5T_STD_U16LE; } };
-
 template<>
 struct hdf5_type_traits<int16_t> { static hid_t type() { return H5T_STD_I16LE; } };
-
+template<>
+struct hdf5_type_traits<int32_t> { static hid_t type() { return H5T_STD_I32LE; } };
+template<>
+struct hdf5_type_traits<uint32_t> { static hid_t type() { return H5T_STD_U32LE; } };
+template<>
+struct hdf5_type_traits<int64_t> { static hid_t type() { return H5T_STD_I64LE; } };
+template<>
+struct hdf5_type_traits<uint64_t> { static hid_t type() { return H5T_STD_U64LE; } };
 template<>
 struct hdf5_type_traits<float> { static hid_t type() { return H5T_IEEE_F32LE; } };
-
 template<>
 struct hdf5_type_traits<double> { static hid_t type() { return H5T_IEEE_F64LE; } };
 
@@ -111,7 +113,7 @@ void cleanup(hid_t &file_id, hid_t &space_id, hid_t &dset_id, hid_t &dcpl_id) {
     }
 }
 
-SCENARIO("The filter can only be applied to integer valued datasets", "[plugin]") {
+TEMPLATE_TEST_CASE("Scenario: the filter can only be applied to compatible integer valued datasets", "[plugin][template]", float, double, int32_t, uint64_t) {
     auto file_name = temp_file().string();
     hid_t file_id = -1;
     hid_t space_id = -1;
@@ -126,7 +128,7 @@ SCENARIO("The filter can only be applied to integer valued datasets", "[plugin]"
         std::array<hsize_t, rank> dimensions{dim, dim};
         space_id = H5Screate_simple(dimensions.size(), dimensions.data(), NULL);
         REQUIRE(space_id >= 0);
-        WHEN("The dataset is crated of floating-point typr") {
+        WHEN("The dataset is created of 32 bit integer type") {
             THEN("The filter cannot be applied") {
                 dcpl_id = H5Pcreate(H5P_DATASET_CREATE);
                 REQUIRE(dcpl_id >= 0);
@@ -135,7 +137,7 @@ SCENARIO("The filter can only be applied to integer valued datasets", "[plugin]"
                 std::array<hsize_t, rank> chunk{dim, dim};
                 status = H5Pset_chunk(dcpl_id, chunk.size(), chunk.data());
                 REQUIRE(status >= 0);
-                dset_id = H5Dcreate(file_id, dataset_name, hdf5_type_traits<float>::type(), space_id, H5P_DEFAULT, dcpl_id, H5P_DEFAULT);
+                dset_id = H5Dcreate(file_id, dataset_name, hdf5_type_traits<TestType>::type(), space_id, H5P_DEFAULT, dcpl_id, H5P_DEFAULT);
                 REQUIRE(dset_id < 0);
             }
         }
