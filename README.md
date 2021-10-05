@@ -3,12 +3,22 @@ JPEG-LS HDF5 Filter
 
 ![CI Build](https://github.com/planetmarshall/jpegls-hdf-filter/actions/workflows/cmake-build.yml/badge.svg)
 
+The JPEG-LS HDF5 filter allows the compression of HDF5 datasets using the 
+[JPEG-LS](https://jpeg.org/jpegls/) codec. It is based
+on original work by _Frans van den Bergh_ and _Derick Swanepoel_. The 
+[CharLS](https://github.com/team-charls/charls) JPEG-LS implementation is used internally.
 
-The JPEG-LS HDF5 filter allows the multi-threaded compression of HDF5 datasets using the JPEG-LS codec. It is based
-on original work by _Frans van den Bergh_ and _Derick Swanepoel_
+This implementation remains backward-compatible with the original version and so retains 
+the [registered filter](https://portal.hdfgroup.org/display/support/Filters) ID `32012`.
 
-This fork builds on that work by adding Windows support and an automated build process. This version has
-been created to serve as a baseline for future development
+Limitations
+-----------
+
+* Only integer typed datasets of up to 16 bits in size are supported. This reflects the 
+  features of the JPEG-LS Codec. For other datasets other compression algorithms, such 
+  as [ZFP](https://github.com/LLNL/H5Z-ZFP) may be more suitable.
+* Only datasets chunked in 2 dimensions are supported (ie, greyscale images). Multi-component
+  images will be supported in a future release.
 
 Build
 -----
@@ -49,6 +59,14 @@ Installation
 2. Install the package according to your OS. The generated packages install the plugin in the
    default search path. HDF5 finds dynamic plugins in non-default locations by 
    searching the path in the environment variable `HDF5_PLUGIN_PATH`.
+
+Backwards Compatibility
+-----------------------
+
+The codec retains the ability to decode datasets created with the original codec, however
+this implementation performs compression in a different way - it no longer divides chunks
+into "stripes" for parallel compression as this behaviour comes at the 
+cost of a poorer compression ratio. Instead, chunks are compressed in their entirety.
 
 Troubleshooting
 ---------------
