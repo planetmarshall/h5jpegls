@@ -12,18 +12,18 @@ jobs:
   linux-build:
     strategy:
       matrix:
-        image: ['conanio/gcc10-ubuntu16.04:1.40.0', 'conanio/clang12-ubuntu16.04:1.40.0']
+        image: ['conanio/gcc10-ubuntu16.04:1.40.3', 'conanio/clang12-ubuntu16.04:1.40.3']
         libcxx: [libstdc++11, libc++]
         exclude:
-          - image: 'conanio/gcc10-ubuntu16.04:1.40.0'
+          - image: 'conanio/gcc10-ubuntu16.04:1.40.3'
             libcxx: libc++
         include:
-          - image: 'conanio/gcc10-ubuntu16.04:1.40.0'
+          - image: 'conanio/gcc10-ubuntu16.04:1.40.3'
             profile: gcc10
-          - image: 'conanio/clang12-ubuntu16.04:1.40.0'
+          - image: 'conanio/clang12-ubuntu16.04:1.40.3'
             libcxx: libc++
             profile: clang12-libc++
-          - image: 'conanio/clang12-ubuntu16.04:1.40.0'
+          - image: 'conanio/clang12-ubuntu16.04:1.40.3'
             libcxx: libstdc++11
             profile: clang12-libstdc++
 
