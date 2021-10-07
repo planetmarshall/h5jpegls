@@ -1,217 +1,245 @@
 #define CATCH_CONFIG_MAIN
-#include "hdf5.h"
 
+#include <hdf5.h>
 #include <catch2/catch.hpp>
+#include <Eigen/Core>
 
-#include <stdio.h>
-#include <stdlib.h>
+#include <filesystem>
+#include <iostream>
+#include <random>
 
-#define FILE "h5ex_d_bzip2.h5"
-#define DATASET "DS1"
-#define DIM0 32
-#define DIM1 64
-#define CHUNK0 16
-#define CHUNK1 32
 const int jpegls_filter_id = 32012;
 
-TEST_CASE("round trip a compressed dataset", "[h5jpegls]") {
-    std::cout << std::getenv("HDF5_PLUGIN_PATH") << std::endl;
+template<typename Scalar>
+using Mx = Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
+namespace fs = std::filesystem;
+
+namespace {
+    fs::path temp_file() {
+        constexpr std::string_view alphanum = "abcdefghjklmnpqrstuvwxyz0123456789";
+        std::random_device dev{};
+        std::mt19937 prg{dev()};
+        std::string prefix;
+        std::sample(alphanum.begin(), alphanum.end(), std::back_inserter(prefix), 8, prg);
+        return fs::temp_directory_path() / (prefix + ".h5");
+    }
+
+    template<typename Scalar>
+    Mx<Scalar> test_data(Eigen::Index rows, Eigen::Index cols) {
+        std::mt19937 prg{0};
+        std::uniform_int_distribution<int64_t> dist(std::numeric_limits<Scalar>::lowest(), std::numeric_limits<Scalar>::max());
+        constexpr Eigen::Index blocks_per_row = 4;
+        constexpr Eigen::Index blocks_per_column = 4;
+        Eigen::Index row_block_size = rows / blocks_per_row;
+        std::array<Eigen::Index, blocks_per_row>
+            row_blocks{row_block_size, row_block_size, row_block_size, rows - (blocks_per_row - 1) * row_block_size};
+
+        Eigen::Index column_block_size = cols / blocks_per_column;
+        std::array<Eigen::Index, blocks_per_column>
+            column_blocks{column_block_size, column_block_size, column_block_size, cols - (blocks_per_column - 1) * column_block_size};
+
+        Mx<Scalar> data(rows, cols);
+        for (int j = 0, block_j = 0; j < blocks_per_row; block_j += row_blocks[j], ++j) {
+            for (int i = 0, block_i = 0; i < blocks_per_column; block_i += column_blocks[i], ++i) {
+                data.block(block_j, block_i, row_blocks[j], column_blocks[i]).array() = dist(prg);
+            }
+        }
+
+        return data;
+    }
+
+    std::pair<H5Z_filter_t, std::string> get_filter_info(hid_t property_list_id) {
+        unsigned int flags{};
+        size_t num_parameters = 8;
+        std::array<unsigned int, 8> parameters{};
+        std::array<char, 1024> name{};
+        auto filter_id = H5Pget_filter2(
+            property_list_id,
+            0,
+            &flags,
+            &num_parameters,
+            parameters.data(),
+            name.size(),
+            name.data(),
+            NULL);
+
+        return {filter_id, std::string(name.data())};
+    }
+}
+
+TEST_CASE("plugin is available", "[plugin]") {
+    REQUIRE(H5Zfilter_avail(jpegls_filter_id) != 0);
+}
+
+template<typename T>
+struct hdf5_type_traits { static hid_t type() { throw; } };
+template<>
+struct hdf5_type_traits<uint8_t> { static hid_t type() { return H5T_STD_U8LE; } };
+template<>
+struct hdf5_type_traits<int8_t> { static hid_t type() { return H5T_STD_I8LE; } };
+template<>
+struct hdf5_type_traits<uint16_t> { static hid_t type() { return H5T_STD_U16LE; } };
+template<>
+struct hdf5_type_traits<int16_t> { static hid_t type() { return H5T_STD_I16LE; } };
+template<>
+struct hdf5_type_traits<int32_t> { static hid_t type() { return H5T_STD_I32LE; } };
+template<>
+struct hdf5_type_traits<uint32_t> { static hid_t type() { return H5T_STD_U32LE; } };
+template<>
+struct hdf5_type_traits<int64_t> { static hid_t type() { return H5T_STD_I64LE; } };
+template<>
+struct hdf5_type_traits<uint64_t> { static hid_t type() { return H5T_STD_U64LE; } };
+template<>
+struct hdf5_type_traits<float> { static hid_t type() { return H5T_IEEE_F32LE; } };
+template<>
+struct hdf5_type_traits<double> { static hid_t type() { return H5T_IEEE_F64LE; } };
+
+void cleanup(hid_t &file_id, hid_t &space_id, hid_t &dset_id, hid_t &dcpl_id) {
+    if (dcpl_id >= 0) {
+        H5Pclose(dcpl_id);
+        dcpl_id = -1;
+    }
+    if (dset_id >= 0) {
+        H5Dclose(dset_id);
+        dset_id = -1;
+    }
+    if (space_id >= 0) {
+        H5Sclose(space_id);
+        space_id = -1;
+    }
+    if (file_id >= 0) {
+        H5Fclose(file_id);
+        file_id = -1;
+    }
+}
+
+TEMPLATE_TEST_CASE("Scenario: the filter can only be applied to compatible integer valued datasets", "[plugin][template]", float, double, int32_t, uint64_t) {
+    auto file_name = temp_file().string();
+    hid_t file_id = -1;
+    hid_t space_id = -1;
+    hid_t dset_id = -1;
+    hid_t dcpl_id = -1;
+    constexpr auto dataset_name = "test";
+    herr_t status;
+    file_id = H5Fcreate(file_name.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+    const hsize_t dim = 4;
+    const hsize_t rank = 2;
+    GIVEN("A 2D dataset") {
+        std::array<hsize_t, rank> dimensions{dim, dim};
+        space_id = H5Screate_simple(dimensions.size(), dimensions.data(), NULL);
+        REQUIRE(space_id >= 0);
+        WHEN("The dataset is created of 32 bit integer type") {
+            THEN("The filter cannot be applied") {
+                dcpl_id = H5Pcreate(H5P_DATASET_CREATE);
+                REQUIRE(dcpl_id >= 0);
+                status = H5Pset_filter(dcpl_id, jpegls_filter_id, H5Z_FLAG_MANDATORY, 0, NULL);
+                REQUIRE(status >= 0);
+                std::array<hsize_t, rank> chunk{dim, dim};
+                status = H5Pset_chunk(dcpl_id, chunk.size(), chunk.data());
+                REQUIRE(status >= 0);
+                dset_id = H5Dcreate(file_id, dataset_name, hdf5_type_traits<TestType>::type(), space_id, H5P_DEFAULT, dcpl_id, H5P_DEFAULT);
+                REQUIRE(dset_id < 0);
+            }
+        }
+    }
+    cleanup(file_id, space_id, dset_id, dcpl_id);
+}
+
+SCENARIO("The filter can only be applied to 2D datasets", "[plugin]") {
+    auto file_name = temp_file().string();
+    hid_t file_id = -1;
+    hid_t space_id = -1;
+    hid_t dset_id = -1;
+    hid_t dcpl_id = -1;
+    constexpr auto dataset_name = "test";
+    herr_t status;
+    file_id = H5Fcreate(file_name.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+    const hsize_t dim = 4;
+    const hsize_t rank = 3;
+    GIVEN("A 3D dataset") {
+        std::array<hsize_t, rank> dimensions{dim, dim, dim};
+        space_id = H5Screate_simple(dimensions.size(), dimensions.data(), NULL);
+        REQUIRE(space_id >= 0);
+        WHEN("The dataset is created") {
+            THEN("The filter cannot be applied") {
+                dcpl_id = H5Pcreate(H5P_DATASET_CREATE);
+                REQUIRE(dcpl_id >= 0);
+                status = H5Pset_filter(dcpl_id, jpegls_filter_id, H5Z_FLAG_MANDATORY, 0, NULL);
+                REQUIRE(status >= 0);
+                std::array<hsize_t, rank> chunk{dim, dim, dim};
+                status = H5Pset_chunk(dcpl_id, chunk.size(), chunk.data());
+                REQUIRE(status >= 0);
+                dset_id = H5Dcreate(file_id, dataset_name, hdf5_type_traits<uint8_t>::type(), space_id, H5P_DEFAULT, dcpl_id, H5P_DEFAULT);
+                REQUIRE(dset_id < 0);
+            }
+        }
+    }
+    cleanup(file_id, space_id, dset_id, dcpl_id);
+}
+
+TEMPLATE_TEST_CASE("Scenario: valid data can written to an HDF5 file, compressed, decompressed and read back", "[plugin][template]", uint8_t, int8_t, uint16_t, int16_t) {
     // Adapted from https://github.com/HDFGroup/hdf5_plugins/blob/master/BZIP2/example/h5ex_d_bzip2.c
     hid_t file_id = -1;
     hid_t space_id = -1;
     hid_t dset_id = -1;
-    hid_t dcpl_id = -1; /* Handles */
+    hid_t dcpl_id = -1;
     herr_t status;
-    H5Z_filter_t filter_id = 0;
-    char filter_name[80];
-    hsize_t dims[2] = {DIM0, DIM1}, 
-            chunk[2] = {CHUNK0, CHUNK1};
-    size_t nelmts = 1;                     /* number of elements in cd_values */
-    const unsigned int cd_values[8] = {0, 0, 0, 0, 0, 0, 0, 0}; /* bzip2 default level is 2 */
-    unsigned int values_out[8] = {99, 99, 99, 99, 99, 99, 99, 99};
-    unsigned int flags;
-    htri_t avail;
-    unsigned filter_config;
-    int16_t wdata[DIM0][DIM1], /* Write buffer */
-        rdata[DIM0][DIM1], /* Read buffer */
-        max, i, j;
+    constexpr auto dataset_name = "test";
+    auto file_name = temp_file().string();
+    file_id = H5Fcreate(file_name.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+    REQUIRE(file_id >=0);
+    GIVEN("A 2D array of integers") {
+        constexpr hsize_t rows = 943;
+        constexpr hsize_t cols = 721;
+        auto data = test_data<TestType>(rows, cols);
+        std::array<hsize_t, 2> dimensions{rows, cols};
+        space_id = H5Screate_simple(dimensions.size(), dimensions.data(), NULL);
+        REQUIRE(space_id >= 0);
+        WHEN("The array is written to a dataset in a single chunk") {
+            dcpl_id = H5Pcreate(H5P_DATASET_CREATE);
+            REQUIRE(dcpl_id >= 0);
+            status = H5Pset_filter(dcpl_id, jpegls_filter_id, H5Z_FLAG_MANDATORY, 0, NULL);
+            REQUIRE(status >= 0);
+            std::array<hsize_t, 2> chunk{rows, cols};
+            status = H5Pset_chunk(dcpl_id, chunk.size(), chunk.data());
+            REQUIRE(status >= 0);
+            dset_id = H5Dcreate(file_id, dataset_name, hdf5_type_traits<TestType>::type(), space_id, H5P_DEFAULT, dcpl_id, H5P_DEFAULT);
+            REQUIRE(dset_id >= 0);
+            status = H5Dwrite(dset_id, hdf5_type_traits<TestType>::type(), H5S_ALL, H5S_ALL, H5P_DEFAULT, data.data());
+            REQUIRE(status >= 0);
+            auto uncompressed_size = data.size() * sizeof(TestType);
+            THEN("The storage size of the dataset is less than that of the array") {
+                auto storage_size = H5Dget_storage_size(dset_id);
+                REQUIRE(storage_size > 0);
+                auto compression_ratio = static_cast<double>(uncompressed_size) / static_cast<double>(storage_size);
+                std::cout << "Compression ratio: " << compression_ratio << "\n";
+                REQUIRE(compression_ratio > 100);
+            }
+            cleanup(file_id, space_id, dset_id, dcpl_id);
+            status = H5close();
+            REQUIRE(status >= 0);
 
-    /*
-     * Initialize data.
-     */
-    for (i = 0; i < DIM0; i++)
-        for (j = 0; j < DIM1; j++)
-            wdata[i][j] = i * j - j;
+            AND_WHEN("The dataset is read back") {
+                file_id = H5Fopen(file_name.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
+                REQUIRE(file_id >= 0);
+                dset_id = H5Dopen(file_id, dataset_name, H5P_DEFAULT);
+                REQUIRE(dset_id >= 0);
+                dcpl_id = H5Dget_create_plist(dset_id);
+                REQUIRE(dcpl_id >= 0);
+                THEN("The filter has been applied") {
+                    const auto [filter_id, filter_name] = get_filter_info(dcpl_id);
+                    REQUIRE(filter_id == jpegls_filter_id);
+                    std::cout << "Filter info: " << filter_name << "\n";
 
-    /*
-     * Create a new file using the default properties.
-     */
-    file_id = H5Fcreate(FILE, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
-    if (file_id < 0) {
-        FAIL("Error creating file");
-    }
-
-    /*
-     * Create dataspace. Setting maximum size to NULL sets the maximum
-     * size to be the current size.
-     */
-    space_id = H5Screate_simple(2, dims, NULL);
-    if (space_id < 0) {
-        FAIL("Error creating dataspace");
-    }
-
-    /*
-     * Create the dataset creation property list, add the bzip2
-     * compression filter and set the chunk size.
-     */
-    dcpl_id = H5Pcreate(H5P_DATASET_CREATE);
-    if (dcpl_id < 0) {
-        FAIL("Error creating dataset properties");
-    }
-    status = H5Pset_filter(dcpl_id, jpegls_filter_id, H5Z_FLAG_OPTIONAL, 0, NULL);
-    if (status < 0) {
-        FAIL("Error setting filter");
-    }
-
-    /*
-     * Check that filter is registered with the library now.
-     * If it is registered, retrieve filter's configuration.
-     */
-    avail = H5Zfilter_avail(jpegls_filter_id);
-    if (avail) {
-        status = H5Zget_filter_info(jpegls_filter_id, &filter_config);
-        if ((filter_config & H5Z_FILTER_CONFIG_ENCODE_ENABLED) && (filter_config & H5Z_FILTER_CONFIG_DECODE_ENABLED))
-            printf("bzip2 filter is available for encoding and decoding.\n");
-    }
-    else {
-        FAIL("Filter could not be found");
-    }
-    status = H5Pset_chunk(dcpl_id, 2, chunk);
-    if (status < 0) {
-        FAIL("Error setting chunk size");
-    }
-
-    /*
-     * Create the dataset.
-     */
-    printf("....Writing bzip2 compressed data ................\n");
-    dset_id = H5Dcreate(file_id, DATASET, H5T_STD_I16LE, space_id, H5P_DEFAULT, dcpl_id, H5P_DEFAULT);
-    if (dset_id < 0) {
-        FAIL("Error creating dataset");
-    }
-
-    /*
-     * Write the data to the dataset.
-     */
-    status = H5Dwrite(dset_id, H5T_STD_I16LE, H5S_ALL, H5S_ALL, H5P_DEFAULT, wdata[0]);
-    if (status < 0) {
-        FAIL("Error writing to dataset");
-    }
-
-    /*
-     * Close and release resources.
-     */
-    H5Dclose(dset_id);
-    dset_id = -1;
-    H5Pclose(dcpl_id);
-    dcpl_id = -1;
-    H5Sclose(space_id);
-    space_id = -1;
-    H5Fclose(file_id);
-    file_id = -1;
-    status = H5close();
-    if (status < 0) {
-        FAIL("Error closing library");
-    }
-
-    printf("....Close the file and reopen for reading ........\n");
-    /*
-     * Now we begin the read section of this example.
-     */
-
-    /*
-     * Open file and dataset using the default properties.
-     */
-    file_id = H5Fopen(FILE, H5F_ACC_RDONLY, H5P_DEFAULT);
-    if (file_id < 0) {
-        FAIL("Error opening file");
-    }
-
-    dset_id = H5Dopen(file_id, DATASET, H5P_DEFAULT);
-    if (dset_id < 0) {
-        FAIL("Error opening dataset");
-    }
-
-    /*
-     * Retrieve dataset creation property list.
-     */
-    dcpl_id = H5Dget_create_plist(dset_id);
-    if (dcpl_id < 0) {
-        FAIL("Error getting dataset property list");
-    }
-    /*
-    * Retrieve and print the filter id, compression level and filter's name
-   for bzip2.
-    */
-    filter_id = H5Pget_filter2(dcpl_id, (unsigned)0, &flags, &nelmts, values_out, sizeof(filter_name), filter_name, NULL);
-    printf("Filter info is available from the dataset creation property \n ");
-    printf(" Filter identifier is ");
-    switch (filter_id) {
-    case jpegls_filter_id:
-        printf("%d\n", filter_id);
-        printf(" Number of parameters is %d with the value %u\n", nelmts, values_out[0]);
-        printf(" To find more about the filter check %s\n", filter_name);
-        break;
-    default:
-        printf("Not expected filter\n");
-        break;
-    }
-
-    /*
-     * Read the data using the default properties.
-     */
-    printf("....Reading bzip2 compressed data ................\n");
-    status = H5Dread(dset_id, H5T_STD_I16LE, H5S_ALL, H5S_ALL, H5P_DEFAULT, rdata[0]);
-    if (status < 0) {
-        FAIL("Error reading data");
-    }
-    /*
-     * Find the maximum value in the dataset, to verify that it was
-     * read correctly.
-     */
-    max = rdata[0][0];
-    for (i = 0; i < DIM0; i++)
-        for (j = 0; j < DIM1; j++) {
-            /*printf("%d \n", rdata[i][j]); */
-            if (max < rdata[i][j])
-                max = rdata[i][j];
+                    AND_THEN("The data is identical to the original") {
+                        Mx<TestType> actual_data(rows, cols);
+                        status = H5Dread(dset_id, hdf5_type_traits<TestType>::type(), H5S_ALL, H5S_ALL, H5P_DEFAULT, actual_data.data());
+                        REQUIRE(status >= 0);
+                        REQUIRE(!(data - actual_data).any());
+                    }
+                }
+            }
         }
-    /*
-     * Print the maximum value.
-     */
-    printf("Maximum value in %s is %d\n", DATASET, max);
-    /*
-     * Check that filter is registered with the library now.
-     */
-    avail = H5Zfilter_avail(jpegls_filter_id);
-    if (avail)
-        printf("bzip2 filter is available now since H5Dread triggered loading of the filter.\n");
-
-    /*
-     * Close and release resources.
-     */
-    if (dcpl_id >= 0) {
-        H5Pclose(dcpl_id);
+        cleanup(file_id, space_id, dset_id, dcpl_id);
     }
-    if (dset_id >= 0) {
-        H5Dclose(dset_id);
-    }
-    if (space_id >= 0) {
-        H5Sclose(space_id);
-    }
-    if (file_id >= 0) {
-        H5Fclose(file_id);
-    }
-
-    SUCCEED();
 }

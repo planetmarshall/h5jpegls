@@ -1,0 +1,227 @@
+#include <H5PLextern.h>
+#include <H5Zpublic.h>
+#include <hdf5.h>
+#include <charls/charls.h>
+
+#include <array>
+#include <vector>
+#include <cassert>
+#include <cstdio>
+#include <cstring>
+
+
+const H5Z_filter_t H5Z_FILTER_JPEGLS = 32012;
+
+struct LegacyParameters {
+    unsigned int width;
+    unsigned int height;
+    unsigned int bytes_per_pixel;
+};
+
+union LegacyCodecParameters {
+    LegacyParameters params;
+    std::array<unsigned int, 3> data;
+};
+
+struct Parameters {
+    unsigned int chunk_m;
+    unsigned int chunk_n;
+    unsigned int bits_per_element;
+    unsigned int divisions_m = 1;
+    unsigned int divisions_n = 1;
+};
+
+union CodecParameters {
+    Parameters params;
+    std::array<unsigned int, 5> data;
+};
+
+size_t decode(void **buffer, size_t *buffer_size, size_t data_size, const Parameters &) {
+    charls::jpegls_decoder decoder;
+    decoder.source(*buffer, data_size);
+    decoder.read_header();
+    auto required_bytes = decoder.destination_size();
+    std::vector<uint8_t> decoding_buffer(required_bytes);
+    decoder.decode(decoding_buffer);
+    if (*buffer_size < required_bytes) {
+        *buffer = realloc(*buffer, required_bytes);
+        *buffer_size = required_bytes;
+    }
+    memcpy(*buffer, decoding_buffer.data(), required_bytes);
+    return required_bytes;
+}
+
+size_t decode_legacy(void **buffer, size_t *buffer_size, const LegacyParameters & parameters) {
+    auto slices = std::min(parameters.height, 24U);
+    std::vector<uint32_t> slice_sizes(slices);
+    size_t header_size = slices * sizeof(uint32_t);
+    std::memcpy(slice_sizes.data(), *buffer, header_size);
+    auto pData = static_cast<uint8_t *>(*buffer) + header_size;
+    size_t offset = 0;
+    size_t required_bytes = parameters.width * parameters.height * parameters.bytes_per_pixel;
+    std::vector<uint8_t> combined_buffer(required_bytes);
+    auto destination = combined_buffer.begin();
+    for (const auto slice : slice_sizes) {
+        charls::jpegls_decoder decoder;
+        decoder.source(pData + offset, slice);
+        decoder.read_header();
+        std::vector<uint8_t> decoding_buffer(decoder.destination_size());
+        decoder.decode(decoding_buffer);
+        std::copy(decoding_buffer.begin(), decoding_buffer.end(), destination);
+        std::advance(destination, decoding_buffer.size());
+        offset += slice;
+    }
+    *buffer = std::realloc(*buffer, required_bytes);
+    *buffer_size = required_bytes;
+    std::memcpy(*buffer, combined_buffer.data(), required_bytes);
+
+    return required_bytes;
+}
+
+size_t encode(
+    void **buffer,
+    size_t *buffer_size,
+    size_t data_size,
+    const Parameters & parameters
+    ) {
+    charls::jpegls_encoder encoder;
+    charls::frame_info frame{
+        .width = parameters.chunk_n,
+        .height = parameters.chunk_m,
+        .bits_per_sample = static_cast<int32_t>(parameters.bits_per_element),
+        .component_count = 1
+    };
+    encoder.frame_info(frame);
+    std::vector<uint8_t> encoding_buffer(*buffer_size);
+    encoder.destination(encoding_buffer);
+    auto num_encoded_bytes = encoder.encode(*buffer, data_size);
+    assert(num_encoded_bytes < *buffer_size);
+    *buffer_size = num_encoded_bytes;
+    memcpy(*buffer, encoding_buffer.data(), num_encoded_bytes);
+    return num_encoded_bytes;
+}
+
+htri_t can_apply_filter(hid_t dcpl_id, hid_t type_id, hid_t) {
+    constexpr hsize_t max_rank = 32;
+    std::array<hsize_t, max_rank> chunk_dimensions{};
+    auto rank = H5Pget_chunk(dcpl_id, 32, chunk_dimensions.data());
+    if (rank != 2) {
+        return 0;
+    }
+    auto type_class = H5Tget_class(type_id);
+    bool can_filter = type_class == H5T_INTEGER;
+    if (type_class == H5T_ARRAY) {
+        auto base_class = H5Tget_super(type_id);
+        can_filter = base_class == H5T_INTEGER;
+        H5Tclose(base_class);
+    }
+    if (!can_filter) {
+        return 0;
+    }
+
+    auto type_size_in_bytes = H5Tget_size(type_id);
+    can_filter = type_size_in_bytes <= 2;
+    return can_filter ? 1 : 0;
+}
+
+size_t codec_filter(unsigned int flags, size_t num_parameters,
+                    const unsigned int parameters[], size_t nbytes, size_t *buf_size, void **buf) {
+
+    CodecParameters codec_parameters{};
+    std::copy(parameters, parameters + num_parameters, std::begin(codec_parameters.data));
+
+    try {
+        if (flags & H5Z_FLAG_REVERSE) {
+            if (num_parameters == 5) {
+                return decode(buf, buf_size, nbytes, codec_parameters.params);
+            }
+            LegacyCodecParameters legacy_codec_parameters{};
+            std::copy(parameters, parameters + num_parameters, std::begin(legacy_codec_parameters.data));
+            return decode_legacy(buf, buf_size, legacy_codec_parameters.params);
+        }
+        return encode(buf, buf_size, nbytes, codec_parameters.params);
+    } catch (const std::exception & ex) {
+        fprintf(stderr, "%s\n", ex.what());
+    } catch (...) {
+        fprintf(stderr, "Unknown error\n");
+    }
+    return 0;
+}
+
+herr_t h5jpegls_set_local(hid_t dcpl_id, hid_t type_id, hid_t) {
+    unsigned int flags;
+    size_t num_user_parameters = 8;
+    std::array<unsigned int, 8> user_parameters{};
+    herr_t status = H5Pget_filter_by_id(
+        dcpl_id,
+        H5Z_FILTER_JPEGLS,
+        &flags,
+        &num_user_parameters,
+        user_parameters.data(),
+        0,
+        nullptr,
+        nullptr
+    );
+
+    if (status < 0) {
+        return -1;
+    }
+
+    std::array<hsize_t, 32> chunk_dimensions{};
+    int rank = H5Pget_chunk(dcpl_id, chunk_dimensions.size(), chunk_dimensions.data());
+    if (rank < 0) {
+        return -1;
+    }
+
+    CodecParameters parameters{};
+    parameters.params.chunk_m = static_cast<unsigned int>(chunk_dimensions[0]);
+    parameters.params.chunk_n = static_cast<unsigned int>(chunk_dimensions[1]);
+
+    if (num_user_parameters > 0) {
+        parameters.params.bits_per_element = user_parameters[0];
+    }
+    else {
+        H5T_class_t type_class = H5Tget_class(type_id);
+        auto bytes_per_element = static_cast<unsigned int>(H5Tget_size(type_id));
+        if (type_class == H5T_ARRAY) {
+            hid_t super_type = H5Tget_super(type_id);
+            bytes_per_element = static_cast<unsigned int>(H5Tget_size(super_type));
+            H5Tclose(super_type);
+        }
+        if (bytes_per_element == 0) {
+            return -1;
+        }
+        parameters.params.bits_per_element = bytes_per_element * 8;
+    }
+
+    if (num_user_parameters == 3) {
+        parameters.params.divisions_m = user_parameters[1];
+        parameters.params.divisions_m = user_parameters[2];
+    }
+
+    status = H5Pmodify_filter(dcpl_id, H5Z_FILTER_JPEGLS, flags, parameters.data.size(), parameters.data.data());
+
+    if (status < 0) {
+        return -1;
+    }
+
+    return 1;
+}
+
+extern "C" const H5Z_class2_t H5Z_JPEGLS[1] = {{
+    H5Z_CLASS_T_VERS,                 /* H5Z_class_t version */
+    (H5Z_filter_t)H5Z_FILTER_JPEGLS,         /* Filter id number */
+    1,              /* encoder_present flag (set to true) */
+    1,              /* decoder_present flag (set to true) */
+    "HDF5 JPEG-LS filter v1.0.0 <https://github.com/planetmarshall/jpegls-hdf-filter>", /* Filter name for debugging */
+    can_apply_filter,           /* The "can apply" callback     */
+    h5jpegls_set_local,           /* The "set local" callback */
+    codec_filter,         /* The actual filter function */
+}};
+
+extern "C" H5PL_type_t H5PLget_plugin_type(void) {
+    return H5PL_TYPE_FILTER; 
+}
+extern "C" const void *H5PLget_plugin_info(void) {
+    return H5Z_JPEGLS;
+}

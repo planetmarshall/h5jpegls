@@ -1,48 +1,34 @@
-cmake_minimum_required(VERSION 3.18)
+cmake_minimum_required(VERSION 3.15)
 project(h5jpegls 
     VERSION 1.0.0
     HOMEPAGE_URL https://github.com/planetmarshall/jpegls-hdf-filter
     LANGUAGES CXX)
 
-add_library(h5jpegls MODULE h5jpegls.cc threadpool.h)
-
 if (EXISTS "${CMAKE_BINARY_DIR}/conanbuildinfo.cmake")
     include(${CMAKE_BINARY_DIR}/conanbuildinfo.cmake)
-    conan_basic_setup()
+    conan_basic_setup(NO_OUTPUT_DIRS)
     list(PREPEND CMAKE_MODULE_PATH ${CMAKE_BINARY_DIR})
+endif()
+
+if (MSVC)
+    add_compile_options(/W4 /permissive-)
+else()
+    add_compile_options(-Wall -Wpedantic -Wextra)
+    add_compile_options("$<$<CXX_COMPILER_ID:Clang,AppleClang>:-Wconversion;-Wconditional-uninitialized>")
 endif()
 
 find_package(Threads REQUIRED)
 find_package(charls REQUIRED)
 find_package(HDF5 REQUIRED COMPONENTS C)
 find_package(Catch2 QUIET)
+
+add_subdirectory(src)
 if(NOT Catch2_FOUND)
     message(WARNING "Catch2 not found - C++ tests will not be available")
 else()
     enable_testing()
     add_subdirectory(test)
 endif()
-
-target_compile_features(
-   h5jpegls
-   PUBLIC
-   cxx_std_17
-   )
-
-target_link_libraries(
-        h5jpegls
-        PRIVATE
-        charls::charls
-        hdf5::hdf5
-        Threads::Threads)
-
-set_target_properties(h5jpegls PROPERTIES LIBRARY_OUTPUT_DIRECTORY $<$<CONFIG:Release,Debug,RelWithDebInfo,MinSizeRel>:plugins>)
-
-install(
-        TARGETS h5jpegls
-        EXPORT h5jpegls_targets
-        LIBRARY DESTINATION hdf5/lib/plugin
-)
 
 set(CPACK_PACKAGE_VENDOR "Andrew Marshall")
 set(CPACK_PACKAGE_CONTACT "planetmarshalluk@gmail.com")

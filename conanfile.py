@@ -33,6 +33,7 @@ class H5jpeglsConan(ConanFile):
 
     def build_requirements(self):
         self.build_requires("catch2/2.13.7")
+        self.build_requires("eigen/3.4.0")
         if self.settings.get_safe("compiler.toolset") is None:
             self.build_requires("ninja/1.10.2")
 
