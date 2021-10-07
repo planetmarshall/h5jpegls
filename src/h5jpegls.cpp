@@ -9,10 +9,34 @@
 #include <cstdio>
 #include <cstring>
 
-// Temporary unofficial filter ID
+
 const H5Z_filter_t H5Z_FILTER_JPEGLS = 32012;
 
-size_t decode(void **buffer, size_t *buffer_size, size_t data_size) {
+struct LegacyParameters {
+    unsigned int width;
+    unsigned int height;
+    unsigned int bytes_per_pixel;
+};
+
+union LegacyCodecParameters {
+    LegacyParameters params;
+    std::array<unsigned int, 3> data;
+};
+
+struct Parameters {
+    unsigned int chunk_m;
+    unsigned int chunk_n;
+    unsigned int bits_per_element;
+    unsigned int divisions_m = 1;
+    unsigned int divisions_n = 1;
+};
+
+union CodecParameters {
+    Parameters params;
+    std::array<unsigned int, 5> data;
+};
+
+size_t decode(void **buffer, size_t *buffer_size, size_t data_size, const Parameters &) {
     charls::jpegls_decoder decoder;
     decoder.source(*buffer, data_size);
     decoder.read_header();
@@ -27,12 +51,44 @@ size_t decode(void **buffer, size_t *buffer_size, size_t data_size) {
     return required_bytes;
 }
 
-size_t encode(void **buffer, size_t *buffer_size, size_t data_size, int bytes_per_element, uint32_t chunk_width, uint32_t chunk_height) {
+size_t decode_legacy(void **buffer, size_t *buffer_size, const LegacyParameters & parameters) {
+    auto slices = std::min(parameters.height, 24U);
+    std::vector<uint32_t> slice_sizes(slices);
+    size_t header_size = slices * sizeof(uint32_t);
+    std::memcpy(slice_sizes.data(), *buffer, header_size);
+    auto pData = static_cast<uint8_t *>(*buffer) + header_size;
+    size_t offset = 0;
+    size_t required_bytes = parameters.width * parameters.height * parameters.bytes_per_pixel;
+    std::vector<uint8_t> combined_buffer(required_bytes);
+    auto destination = combined_buffer.begin();
+    for (const auto slice : slice_sizes) {
+        charls::jpegls_decoder decoder;
+        decoder.source(pData + offset, slice);
+        decoder.read_header();
+        std::vector<uint8_t> decoding_buffer(decoder.destination_size());
+        decoder.decode(decoding_buffer);
+        std::copy(decoding_buffer.begin(), decoding_buffer.end(), destination);
+        std::advance(destination, decoding_buffer.size());
+        offset += slice;
+    }
+    *buffer = std::realloc(*buffer, required_bytes);
+    *buffer_size = required_bytes;
+    std::memcpy(*buffer, combined_buffer.data(), required_bytes);
+
+    return required_bytes;
+}
+
+size_t encode(
+    void **buffer,
+    size_t *buffer_size,
+    size_t data_size,
+    const Parameters & parameters
+    ) {
     charls::jpegls_encoder encoder;
     charls::frame_info frame{
-        .width = chunk_width,
-        .height = chunk_height,
-        .bits_per_sample = bytes_per_element * 8,
+        .width = parameters.chunk_n,
+        .height = parameters.chunk_m,
+        .bits_per_sample = static_cast<int32_t>(parameters.bits_per_element),
         .component_count = 1
     };
     encoder.frame_info(frame);
@@ -45,7 +101,7 @@ size_t encode(void **buffer, size_t *buffer_size, size_t data_size, int bytes_pe
     return num_encoded_bytes;
 }
 
-htri_t can_apply_filter(hid_t dcpl_id, hid_t type_id, hid_t space_id) {
+htri_t can_apply_filter(hid_t dcpl_id, hid_t type_id, hid_t) {
     constexpr hsize_t max_rank = 32;
     std::array<hsize_t, max_rank> chunk_dimensions{};
     auto rank = H5Pget_chunk(dcpl_id, 32, chunk_dimensions.data());
@@ -68,74 +124,84 @@ htri_t can_apply_filter(hid_t dcpl_id, hid_t type_id, hid_t space_id) {
     return can_filter ? 1 : 0;
 }
 
-size_t codec_filter(unsigned int flags, size_t cd_nelmts,
-                    const unsigned int cd_values[], size_t nbytes, size_t *buf_size, void **buf) {
+size_t codec_filter(unsigned int flags, size_t num_parameters,
+                    const unsigned int parameters[], size_t nbytes, size_t *buf_size, void **buf) {
 
-    int width = cd_values[0];
-    int height = cd_values[1];
-    int typesize = cd_values[2];
+    CodecParameters codec_parameters{};
+    std::copy(parameters, parameters + num_parameters, std::begin(codec_parameters.data));
 
     try {
         if (flags & H5Z_FLAG_REVERSE) {
-            return decode(buf, buf_size, nbytes);
+            if (num_parameters == 5) {
+                return decode(buf, buf_size, nbytes, codec_parameters.params);
+            }
+            LegacyCodecParameters legacy_codec_parameters{};
+            std::copy(parameters, parameters + num_parameters, std::begin(legacy_codec_parameters.data));
+            return decode_legacy(buf, buf_size, legacy_codec_parameters.params);
         }
-        return encode(buf, buf_size, nbytes, typesize, width, height);
+        return encode(buf, buf_size, nbytes, codec_parameters.params);
     } catch (const std::exception & ex) {
-        fprintf(stderr, ex.what());
-        fprintf(stderr, "\n");
+        fprintf(stderr, "%s\n", ex.what());
     } catch (...) {
         fprintf(stderr, "Unknown error\n");
     }
     return 0;
 }
 
-herr_t h5jpegls_set_local(hid_t dcpl_id, hid_t type_id, hid_t chunk_space_id) {
+herr_t h5jpegls_set_local(hid_t dcpl_id, hid_t type_id, hid_t) {
     unsigned int flags;
-    size_t nelements = 8;
-    unsigned int values[] = {0,0,0,0,0,0,0,0};
-    herr_t r = H5Pget_filter_by_id(dcpl_id, H5Z_FILTER_JPEGLS, &flags, &nelements, values, 0, NULL, NULL);
+    size_t num_user_parameters = 8;
+    std::array<unsigned int, 8> user_parameters{};
+    herr_t status = H5Pget_filter_by_id(
+        dcpl_id,
+        H5Z_FILTER_JPEGLS,
+        &flags,
+        &num_user_parameters,
+        user_parameters.data(),
+        0,
+        nullptr,
+        nullptr
+    );
 
-    if (r < 0) {
+    if (status < 0) {
         return -1;
     }
 
-    // TODO: if some parameters were passed (e.g., number of subchunks)
-    // we should extract them here
-
-    hsize_t chunkdims[32];
-    int ndims = H5Pget_chunk(dcpl_id, 32, chunkdims);
-    if (ndims < 0) {
+    std::array<hsize_t, 32> chunk_dimensions{};
+    int rank = H5Pget_chunk(dcpl_id, chunk_dimensions.size(), chunk_dimensions.data());
+    if (rank < 0) {
         return -1;
     }
 
-    int byte_mode = nelements > 0 && values[0] != 0;
+    CodecParameters parameters{};
+    parameters.params.chunk_m = static_cast<unsigned int>(chunk_dimensions[0]);
+    parameters.params.chunk_n = static_cast<unsigned int>(chunk_dimensions[1]);
 
-    values[0] = chunkdims[ndims-1];
-    values[1] = (ndims == 1) ? 1 : chunkdims[ndims-2];
-
-    unsigned int typesize = H5Tget_size(type_id);
-    if (typesize == 0) {
-        return -1;
+    if (num_user_parameters > 0) {
+        parameters.params.bits_per_element = user_parameters[0];
+    }
+    else {
+        H5T_class_t type_class = H5Tget_class(type_id);
+        auto bytes_per_element = static_cast<unsigned int>(H5Tget_size(type_id));
+        if (type_class == H5T_ARRAY) {
+            hid_t super_type = H5Tget_super(type_id);
+            bytes_per_element = static_cast<unsigned int>(H5Tget_size(super_type));
+            H5Tclose(super_type);
+        }
+        if (bytes_per_element == 0) {
+            return -1;
+        }
+        parameters.params.bits_per_element = bytes_per_element * 8;
     }
 
-    H5T_class_t classt = H5Tget_class(type_id);
-    if (classt == H5T_ARRAY) {
-        hid_t super_type = H5Tget_super(type_id);
-        typesize = H5Tget_size(super_type);
-        H5Tclose(super_type);
+    if (num_user_parameters == 3) {
+        parameters.params.divisions_m = user_parameters[1];
+        parameters.params.divisions_m = user_parameters[2];
     }
 
-    if (byte_mode) {
-        values[2] = 1;
-        values[0] *= typesize;
-    } else {
-        values[2] = typesize;
-    }
+    status = H5Pmodify_filter(dcpl_id, H5Z_FILTER_JPEGLS, flags, parameters.data.size(), parameters.data.data());
 
-    nelements = 3; // TODO: update if we accept #subchunks
-    r = H5Pmodify_filter(dcpl_id, H5Z_FILTER_JPEGLS, flags, nelements, values);
-
-    if (r < 0) {
+    if (status < 0) {
         return -1;
     }
 
