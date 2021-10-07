@@ -45,6 +45,7 @@ jobs:
           conan lock create conanfile.py ${CONAN_ARGS}
       - name: get conan cache
         uses: actions/cache@v2
+        id: cache
         with:
           path: |
             ~/.conan/data
@@ -53,6 +54,9 @@ jobs:
           restore-keys: |
             conan-${{ matrix.profile }}-${{ hashfiles('base.lock') }}
             conan-${{ matrix.profile }}
+      - name: Install Dependencies
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: conan install . --install-folder build --build missing --build hdf5
       - name: install conan dependencies
         run: |
           conan install . \
