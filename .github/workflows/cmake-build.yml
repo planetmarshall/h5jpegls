@@ -73,7 +73,7 @@ jobs:
           ctest --extra-verbose --no-tests=error
       - name: build package
         run: |
-          cpack -G DEB -B package --config build/CPackConfig.cmake 
+          cpack -G DEB -B $(pwd)/package --config build/CPackConfig.cmake
       - name: upload package
         uses: actions/upload-artifact@v2
         with:
