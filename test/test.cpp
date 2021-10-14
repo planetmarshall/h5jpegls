@@ -39,8 +39,8 @@ namespace {
             column_blocks{column_block_size, column_block_size, column_block_size, cols - (blocks_per_column - 1) * column_block_size};
 
         Mx<Scalar> data(rows, cols);
-        for (int j = 0, block_j = 0; j < blocks_per_row; block_j += row_blocks[j], ++j) {
-            for (int i = 0, block_i = 0; i < blocks_per_column; block_i += column_blocks[i], ++i) {
+        for (size_t j = 0, block_j = 0; j < blocks_per_row; block_j += static_cast<size_t>(row_blocks[j]), ++j) {
+            for (size_t i = 0, block_i = 0; i < blocks_per_column; block_i += static_cast<size_t>(column_blocks[i]), ++i) {
                 data.block(block_j, block_i, row_blocks[j], column_blocks[i]).array() = dist(prg);
             }
         }
