@@ -12,31 +12,44 @@
 
 const H5Z_filter_t H5Z_FILTER_JPEGLS = 32012;
 
-struct LegacyParameters {
-    unsigned int width;
-    unsigned int height;
-    unsigned int bytes_per_pixel;
+struct LegacyCodecParameters {
+    static LegacyCodecParameters from_array(const unsigned int params[]) {
+        return {
+            .width = params[0],
+            .height = params[1],
+            .bytes_per_pixel = params[2]};
+    }
+
+    unsigned int width{};
+    unsigned int height{};
+    unsigned int bytes_per_pixel{};
 };
 
-union LegacyCodecParameters {
-    LegacyParameters params;
-    std::array<unsigned int, 3> data;
-};
+struct CodecParameters {
+    static CodecParameters from_array(const unsigned int params[]) {
+        return {
+            .chunk_m = params[0],
+            .chunk_n = params[1],
+            .bits_per_element = params[2],
+            .divisions_m = params[3],
+            .divisions_n = params[4]
+        };
+    }
 
-struct Parameters {
-    unsigned int chunk_m;
-    unsigned int chunk_n;
-    unsigned int bits_per_element;
+    unsigned int chunk_m{};
+    unsigned int chunk_n{};
+    unsigned int bits_per_element{};
     unsigned int divisions_m = 1;
     unsigned int divisions_n = 1;
+
+    [[nodiscard]]
+    std::array<unsigned int, 5> elements() const {
+        return {chunk_m, chunk_n, bits_per_element, divisions_m, divisions_n};
+    }
 };
 
-union CodecParameters {
-    Parameters params;
-    std::array<unsigned int, 5> data;
-};
 
-size_t decode(void **buffer, size_t *buffer_size, size_t data_size, const Parameters &) {
+size_t decode(void **buffer, size_t *buffer_size, size_t data_size, const CodecParameters &) {
     charls::jpegls_decoder decoder;
     decoder.source(*buffer, data_size);
     decoder.read_header();
@@ -51,7 +64,7 @@ size_t decode(void **buffer, size_t *buffer_size, size_t data_size, const Parame
     return required_bytes;
 }
 
-size_t decode_legacy(void **buffer, size_t *buffer_size, const LegacyParameters & parameters) {
+size_t decode_legacy(void **buffer, size_t *buffer_size, const LegacyCodecParameters & parameters) {
     auto slices = std::min(parameters.height, 24U);
     std::vector<uint32_t> slice_sizes(slices);
     size_t header_size = slices * sizeof(uint32_t);
@@ -82,7 +95,7 @@ size_t encode(
     void **buffer,
     size_t *buffer_size,
     size_t data_size,
-    const Parameters & parameters
+    const CodecParameters & parameters
     ) {
     charls::jpegls_encoder encoder;
     charls::frame_info frame{
@@ -127,19 +140,14 @@ htri_t can_apply_filter(hid_t dcpl_id, hid_t type_id, hid_t) {
 size_t codec_filter(unsigned int flags, size_t num_parameters,
                     const unsigned int parameters[], size_t nbytes, size_t *buf_size, void **buf) {
 
-    CodecParameters codec_parameters{};
-    std::copy(parameters, parameters + num_parameters, std::begin(codec_parameters.data));
-
     try {
         if (flags & H5Z_FLAG_REVERSE) {
             if (num_parameters == 5) {
-                return decode(buf, buf_size, nbytes, codec_parameters.params);
+                return decode(buf, buf_size, nbytes, CodecParameters::from_array(parameters));
             }
-            LegacyCodecParameters legacy_codec_parameters{};
-            std::copy(parameters, parameters + num_parameters, std::begin(legacy_codec_parameters.data));
-            return decode_legacy(buf, buf_size, legacy_codec_parameters.params);
+            return decode_legacy(buf, buf_size, LegacyCodecParameters::from_array(parameters));
         }
-        return encode(buf, buf_size, nbytes, codec_parameters.params);
+        return encode(buf, buf_size, nbytes, CodecParameters::from_array(parameters));
     } catch (const std::exception & ex) {
         fprintf(stderr, "%s\n", ex.what());
     } catch (...) {
@@ -173,12 +181,13 @@ herr_t h5jpegls_set_local(hid_t dcpl_id, hid_t type_id, hid_t) {
         return -1;
     }
 
-    CodecParameters parameters{};
-    parameters.params.chunk_m = static_cast<unsigned int>(chunk_dimensions[0]);
-    parameters.params.chunk_n = static_cast<unsigned int>(chunk_dimensions[1]);
+    CodecParameters parameters{
+        .chunk_m = static_cast<unsigned int>(chunk_dimensions[0]),
+        .chunk_n = static_cast<unsigned int>(chunk_dimensions[1])
+    };
 
     if (num_user_parameters > 0) {
-        parameters.params.bits_per_element = user_parameters[0];
+        parameters.bits_per_element = user_parameters[0];
     }
     else {
         H5T_class_t type_class = H5Tget_class(type_id);
@@ -191,15 +200,16 @@ herr_t h5jpegls_set_local(hid_t dcpl_id, hid_t type_id, hid_t) {
         if (bytes_per_element == 0) {
             return -1;
         }
-        parameters.params.bits_per_element = bytes_per_element * 8;
+        parameters.bits_per_element = bytes_per_element * 8;
     }
 
     if (num_user_parameters == 3) {
-        parameters.params.divisions_m = user_parameters[1];
-        parameters.params.divisions_m = user_parameters[2];
+        parameters.divisions_m = user_parameters[1];
+        parameters.divisions_m = user_parameters[2];
     }
 
-    status = H5Pmodify_filter(dcpl_id, H5Z_FILTER_JPEGLS, flags, parameters.data.size(), parameters.data.data());
+    auto cd_values = parameters.elements();
+    status = H5Pmodify_filter(dcpl_id, H5Z_FILTER_JPEGLS, flags, cd_values.size(), cd_values.data());
 
     if (status < 0) {
         return -1;
@@ -219,9 +229,9 @@ extern "C" const H5Z_class2_t H5Z_JPEGLS[1] = {{
     codec_filter,         /* The actual filter function */
 }};
 
-extern "C" H5PL_type_t H5PLget_plugin_type(void) {
+extern "C" [[maybe_unused]] H5PL_type_t H5PLget_plugin_type(void) {
     return H5PL_TYPE_FILTER; 
 }
-extern "C" const void *H5PLget_plugin_info(void) {
+extern "C" [[maybe_unused]] const void *H5PLget_plugin_info(void) {
     return H5Z_JPEGLS;
 }
