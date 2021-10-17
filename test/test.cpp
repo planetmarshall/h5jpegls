@@ -1,4 +1,7 @@
 #define CATCH_CONFIG_MAIN
+#ifdef H5JPEGLS_STATIC_PLUGIN
+#include <h5jpegls.h>
+#endif
 
 #include <hdf5.h>
 #include <catch2/catch.hpp>
@@ -65,9 +68,16 @@ namespace {
 
         return {filter_id, std::string(name.data())};
     }
+
+void register_plugin() {
+#ifdef H5JPEGLS_STATIC_PLUGIN
+    h5jpegls_register_plugin();
+#endif
+    }
 }
 
 TEST_CASE("plugin is available", "[plugin]") {
+    register_plugin();
     REQUIRE(H5Zfilter_avail(jpegls_filter_id) != 0);
 }
 
@@ -113,7 +123,9 @@ void cleanup(hid_t &file_id, hid_t &space_id, hid_t &dset_id, hid_t &dcpl_id) {
     }
 }
 
+
 TEMPLATE_TEST_CASE("Scenario: the filter can only be applied to compatible integer valued datasets", "[plugin][template]", float, double, int32_t, uint64_t) {
+    register_plugin();
     auto file_name = temp_file().string();
     hid_t file_id = -1;
     hid_t space_id = -1;
@@ -146,6 +158,7 @@ TEMPLATE_TEST_CASE("Scenario: the filter can only be applied to compatible integ
 }
 
 SCENARIO("The filter can only be applied to 2D datasets", "[plugin]") {
+    register_plugin();
     auto file_name = temp_file().string();
     hid_t file_id = -1;
     hid_t space_id = -1;
@@ -179,6 +192,7 @@ SCENARIO("The filter can only be applied to 2D datasets", "[plugin]") {
 
 TEMPLATE_TEST_CASE("Scenario: valid data can written to an HDF5 file, compressed, decompressed and read back", "[plugin][template]", uint8_t, int8_t, uint16_t, int16_t) {
     // Adapted from https://github.com/HDFGroup/hdf5_plugins/blob/master/BZIP2/example/h5ex_d_bzip2.c
+    register_plugin();
     hid_t file_id = -1;
     hid_t space_id = -1;
     hid_t dset_id = -1;

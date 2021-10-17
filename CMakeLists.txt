@@ -4,6 +4,11 @@ project(h5jpegls
     HOMEPAGE_URL https://github.com/planetmarshall/jpegls-hdf-filter
     LANGUAGES CXX)
 
+option(H5JPEGLS_STATIC_PLUGIN "Build the library as a static plugin to be linked into an application" OFF)
+if (H5JPEGLS_STATIC_PLUGIN)
+    message(STATUS "H5JPEGLS: Building Static Plugin")
+endif()
+
 if (EXISTS "${CMAKE_BINARY_DIR}/conanbuildinfo.cmake")
     include(${CMAKE_BINARY_DIR}/conanbuildinfo.cmake)
     conan_basic_setup(NO_OUTPUT_DIRS)
@@ -14,7 +19,9 @@ if (MSVC)
     add_compile_options(/W4 /permissive-)
 else()
     add_compile_options(-Wall -Wpedantic -Wextra)
-    add_compile_options("$<$<CXX_COMPILER_ID:Clang,AppleClang>:-Wconversion;-Wconditional-uninitialized>")
+    if(CMAKE_CXX_COMPILER_ID MATCHES (Clang|AppleClang))
+        add_compile_options(-Wconversion -Wconditional-uninitialized>)
+    endif()
 endif()
 
 find_package(Threads REQUIRED)

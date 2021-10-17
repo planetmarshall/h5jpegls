@@ -1,4 +1,4 @@
-#include <H5PLextern.h>
+#include "h5jpegls.h"
 #include <H5Zpublic.h>
 #include <hdf5.h>
 #include <charls/charls.h>
@@ -229,9 +229,13 @@ extern "C" const H5Z_class2_t H5Z_JPEGLS[1] = {{
     codec_filter,         /* The actual filter function */
 }};
 
-extern "C" [[maybe_unused]] H5PL_type_t H5PLget_plugin_type(void) {
+extern "C" H5PL_type_t H5PLget_plugin_type(void) {
     return H5PL_TYPE_FILTER; 
 }
-extern "C" [[maybe_unused]] const void *H5PLget_plugin_info(void) {
+extern "C" const void *H5PLget_plugin_info(void) {
     return H5Z_JPEGLS;
+}
+
+void h5jpegls_register_plugin() {
+    H5Zregister(H5Z_JPEGLS);
 }
