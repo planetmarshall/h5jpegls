@@ -12,11 +12,13 @@ class H5jpeglsConan(ConanFile):
     settings = "os", "compiler", "build_type", "arch"
     options = {
         "fPIC": [True, False],
-        "static_plugin": [True, False]
+        "static_plugin": [True, False],
+        "shared": [True, False]
     }
     default_options = {
         "fPIC": True,
-        "static_plugin": False
+        "static_plugin": False,
+        "shared": True
     }
     generators = "cmake", "cmake_find_package"
     scm = {
@@ -32,7 +34,7 @@ class H5jpeglsConan(ConanFile):
 
     def configure(self):
         if not self.options.static_plugin:
-            self.options["hdf5:shared"] = True
+            self.options["hdf5"].shared = True
 
     def requirements(self):
         self.requires("hdf5/1.12.0")
@@ -49,7 +51,7 @@ class H5jpeglsConan(ConanFile):
             return self._cmake
 
         self._cmake = CMake(self)
-        self._cmake["H5JPEGLS_STATIC_PLUGIN"] = self.options.static_plugin
+        self._cmake.definitions["H5JPEGLS_STATIC_PLUGIN"] = self.options.static_plugin
         self._cmake.configure()
         return self._cmake
 

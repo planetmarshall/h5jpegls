@@ -14,6 +14,7 @@ jobs:
       matrix:
         image: ['conanio/gcc10-ubuntu16.04:1.40.3', 'conanio/clang12-ubuntu16.04:1.40.3']
         libcxx: [libstdc++11, libc++]
+        plugin: [module, shared, static]
         exclude:
           - image: 'conanio/gcc10-ubuntu16.04:1.40.3'
             libcxx: libc++
@@ -37,9 +38,12 @@ jobs:
       - name: create conan cache keys
         run: |
           conan config install .github/workflows/conan
+          bash .github/workflows/set_env_vars.sh ${{ matrix.plugin }}
           CONAN_ARGS="
             --profile ${{ matrix.profile }} \
-            --build missing
+            --build missing \
+            --build hdf5 \
+            ${CONAN_OPTIONS}
           "
           conan lock create conanfile.py ${CONAN_ARGS}
       - name: get conan cache
@@ -50,9 +54,6 @@ jobs:
             /home/conan/.conan/data
             !/home/conan/.conan/data/**/conan_sources.tgz
           key: conan-${{ matrix.profile }}-${{ hashFiles('conan.lock') }}
-      - name: Build Dependencies
-        if: steps.cache.outputs.cache-hit != 'true'
-        run: conan install . --install-folder build --build missing --build hdf5
       - name: install conan dependencies
         run: |
           conan install . \
@@ -65,7 +66,9 @@ jobs:
       - name: run tests
         run: |
           cd build
-          export HDF5_PLUGIN_PATH=$(pwd)/plugins
+          if [ "${{ matrix.plugin }}" = "module"]; then
+            export HDF5_PLUGIN_PATH=$(pwd)/plugins
+          fi
           ctest --extra-verbose --no-tests=error
       - name: build package
         run: |
@@ -73,7 +76,7 @@ jobs:
       - name: upload package
         uses: actions/upload-artifact@v2
         with:
-          name: linux-${{ matrix.profile }}-package
+          name: linux-${{ matrix.profile }}-${{ matrix.plugin }}-package
           path: package/*.deb
   linux-test:
     needs: linux-build
@@ -89,7 +92,7 @@ jobs:
     - name: download linux package
       uses: actions/download-artifact@v2
       with:
-        name: linux-gcc10-package
+        name: linux-gcc10-module-package
         path: package
     - name: install linux package
       run: |
@@ -107,6 +110,7 @@ jobs:
     strategy:
       matrix:
         profile: [vs2019, vs2019-clang]
+        plugin: [static, shared, module]
     runs-on: windows-2019
     steps:
       - name: checkout repository
@@ -115,9 +119,11 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install --upgrade conan
+          bash .github/workflows/set_env_vars.sh ${{ matrix.plugin }}
           CONAN_ARGS="
             --profile .github/workflows/conan/profiles/${{ matrix.profile }} \
-            --build missing
+            --build missing \
+            ${CONAN_OPTIONS}
           "
           conan lock create conanfile.py ${CONAN_ARGS} --base --lockfile-out base.lock
           conan lock create conanfile.py ${CONAN_ARGS}
@@ -159,7 +165,7 @@ jobs:
       - name: upload package
         uses: actions/upload-artifact@v2
         with:
-          name: windows-${{ matrix.profile }}-package
+          name: windows-${{ matrix.profile }}-${{ matrix.plugin }}-package
           path: package/*.exe
   windows-test:
     needs: windows-build
@@ -174,7 +180,7 @@ jobs:
         lfs: true
     - uses: actions/download-artifact@v2
       with:
-        name: windows-vs2019-package
+        name: windows-vs2019-module-package
         path: package
     - name: setup python 3
       uses: actions/setup-python@v2
