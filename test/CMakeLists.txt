@@ -1,5 +1,10 @@
 add_executable(h5jpegls_test test.cpp)
-add_dependencies(h5jpegls_test h5jpegls)
+if (H5JPEGLS_STATIC_PLUGIN)
+	target_link_libraries(h5jpegls_test PRIVATE h5jpegls)
+	add_compile_definitions(h5jpegls_test PRIVATE H5JPEGLS_STATIC_PLUGIN)
+else()
+	add_dependencies(h5jpegls_test h5jpegls)
+endif()
 
 find_package(Eigen3 REQUIRED)
 

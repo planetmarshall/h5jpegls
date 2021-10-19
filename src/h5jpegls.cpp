@@ -1,6 +1,9 @@
-#include <H5PLextern.h>
+#include <h5jpegls/h5jpegls.h>
 #include <H5Zpublic.h>
+#pragma warning( push )
+#pragma warning( disable : 4768 )
 #include <hdf5.h>
+#pragma warning( pop )
 #include <charls/charls.h>
 
 #include <array>
@@ -9,15 +12,12 @@
 #include <cstdio>
 #include <cstring>
 
-
+namespace {
 const H5Z_filter_t H5Z_FILTER_JPEGLS = 32012;
 
 struct LegacyCodecParameters {
     static LegacyCodecParameters from_array(const unsigned int params[]) {
-        return {
-            .width = params[0],
-            .height = params[1],
-            .bytes_per_pixel = params[2]};
+        return {.width = params[0], .height = params[1], .bytes_per_pixel = params[2]};
     }
 
     unsigned int width{};
@@ -28,12 +28,7 @@ struct LegacyCodecParameters {
 struct CodecParameters {
     static CodecParameters from_array(const unsigned int params[]) {
         return {
-            .chunk_m = params[0],
-            .chunk_n = params[1],
-            .bits_per_element = params[2],
-            .divisions_m = params[3],
-            .divisions_n = params[4]
-        };
+            .chunk_m = params[0], .chunk_n = params[1], .bits_per_element = params[2], .divisions_m = params[3], .divisions_n = params[4]};
     }
 
     unsigned int chunk_m{};
@@ -42,12 +37,8 @@ struct CodecParameters {
     unsigned int divisions_m = 1;
     unsigned int divisions_n = 1;
 
-    [[nodiscard]]
-    std::array<unsigned int, 5> elements() const {
-        return {chunk_m, chunk_n, bits_per_element, divisions_m, divisions_n};
-    }
+    [[nodiscard]] std::array<unsigned int, 5> elements() const { return {chunk_m, chunk_n, bits_per_element, divisions_m, divisions_n}; }
 };
-
 
 size_t decode(void **buffer, size_t *buffer_size, size_t data_size, const CodecParameters &) {
     charls::jpegls_decoder decoder;
@@ -64,7 +55,7 @@ size_t decode(void **buffer, size_t *buffer_size, size_t data_size, const CodecP
     return required_bytes;
 }
 
-size_t decode_legacy(void **buffer, size_t *buffer_size, const LegacyCodecParameters & parameters) {
+size_t decode_legacy(void **buffer, size_t *buffer_size, const LegacyCodecParameters &parameters) {
     auto slices = std::min(parameters.height, 24U);
     std::vector<uint32_t> slice_sizes(slices);
     size_t header_size = slices * sizeof(uint32_t);
@@ -91,19 +82,12 @@ size_t decode_legacy(void **buffer, size_t *buffer_size, const LegacyCodecParame
     return required_bytes;
 }
 
-size_t encode(
-    void **buffer,
-    size_t *buffer_size,
-    size_t data_size,
-    const CodecParameters & parameters
-    ) {
+size_t encode(void **buffer, size_t *buffer_size, size_t data_size, const CodecParameters &parameters) {
     charls::jpegls_encoder encoder;
-    charls::frame_info frame{
-        .width = parameters.chunk_n,
-        .height = parameters.chunk_m,
-        .bits_per_sample = static_cast<int32_t>(parameters.bits_per_element),
-        .component_count = 1
-    };
+    charls::frame_info frame{.width = parameters.chunk_n,
+                             .height = parameters.chunk_m,
+                             .bits_per_sample = static_cast<int32_t>(parameters.bits_per_element),
+                             .component_count = 1};
     encoder.frame_info(frame);
     std::vector<uint8_t> encoding_buffer(*buffer_size);
     encoder.destination(encoding_buffer);
@@ -137,8 +121,8 @@ htri_t can_apply_filter(hid_t dcpl_id, hid_t type_id, hid_t) {
     return can_filter ? 1 : 0;
 }
 
-size_t codec_filter(unsigned int flags, size_t num_parameters,
-                    const unsigned int parameters[], size_t nbytes, size_t *buf_size, void **buf) {
+size_t codec_filter(unsigned int flags, size_t num_parameters, const unsigned int parameters[], size_t nbytes, size_t *buf_size,
+                    void **buf) {
 
     try {
         if (flags & H5Z_FLAG_REVERSE) {
@@ -148,7 +132,7 @@ size_t codec_filter(unsigned int flags, size_t num_parameters,
             return decode_legacy(buf, buf_size, LegacyCodecParameters::from_array(parameters));
         }
         return encode(buf, buf_size, nbytes, CodecParameters::from_array(parameters));
-    } catch (const std::exception & ex) {
+    } catch (const std::exception &ex) {
         fprintf(stderr, "%s\n", ex.what());
     } catch (...) {
         fprintf(stderr, "Unknown error\n");
@@ -160,16 +144,8 @@ herr_t h5jpegls_set_local(hid_t dcpl_id, hid_t type_id, hid_t) {
     unsigned int flags;
     size_t num_user_parameters = 8;
     std::array<unsigned int, 8> user_parameters{};
-    herr_t status = H5Pget_filter_by_id(
-        dcpl_id,
-        H5Z_FILTER_JPEGLS,
-        &flags,
-        &num_user_parameters,
-        user_parameters.data(),
-        0,
-        nullptr,
-        nullptr
-    );
+    herr_t status =
+        H5Pget_filter_by_id(dcpl_id, H5Z_FILTER_JPEGLS, &flags, &num_user_parameters, user_parameters.data(), 0, nullptr, nullptr);
 
     if (status < 0) {
         return -1;
@@ -181,15 +157,12 @@ herr_t h5jpegls_set_local(hid_t dcpl_id, hid_t type_id, hid_t) {
         return -1;
     }
 
-    CodecParameters parameters{
-        .chunk_m = static_cast<unsigned int>(chunk_dimensions[0]),
-        .chunk_n = static_cast<unsigned int>(chunk_dimensions[1])
-    };
+    CodecParameters parameters{.chunk_m = static_cast<unsigned int>(chunk_dimensions[0]),
+                               .chunk_n = static_cast<unsigned int>(chunk_dimensions[1])};
 
     if (num_user_parameters > 0) {
         parameters.bits_per_element = user_parameters[0];
-    }
-    else {
+    } else {
         H5T_class_t type_class = H5Tget_class(type_id);
         auto bytes_per_element = static_cast<unsigned int>(H5Tget_size(type_id));
         if (type_class == H5T_ARRAY) {
@@ -217,6 +190,7 @@ herr_t h5jpegls_set_local(hid_t dcpl_id, hid_t type_id, hid_t) {
 
     return 1;
 }
+}
 
 extern "C" const H5Z_class2_t H5Z_JPEGLS[1] = {{
     H5Z_CLASS_T_VERS,                 /* H5Z_class_t version */
@@ -229,9 +203,13 @@ extern "C" const H5Z_class2_t H5Z_JPEGLS[1] = {{
     codec_filter,         /* The actual filter function */
 }};
 
-extern "C" [[maybe_unused]] H5PL_type_t H5PLget_plugin_type(void) {
+extern "C" H5PL_type_t H5PLget_plugin_type(void) {
     return H5PL_TYPE_FILTER; 
 }
-extern "C" [[maybe_unused]] const void *H5PLget_plugin_info(void) {
+extern "C" const void *H5PLget_plugin_info(void) {
     return H5Z_JPEGLS;
+}
+
+void h5jpegls_register_plugin() {
+    H5Zregister(H5Z_JPEGLS);
 }

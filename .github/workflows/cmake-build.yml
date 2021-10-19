@@ -14,6 +14,7 @@ jobs:
       matrix:
         image: ['conanio/gcc10-ubuntu16.04:1.40.3', 'conanio/clang12-ubuntu16.04:1.40.3']
         libcxx: [libstdc++11, libc++]
+        plugin: [module, shared, static]
         exclude:
           - image: 'conanio/gcc10-ubuntu16.04:1.40.3'
             libcxx: libc++
@@ -34,6 +35,9 @@ jobs:
     steps:
       - name: checkout repository
         uses: actions/checkout@v2
+      - name: set environment variables
+        run: |
+          bash .github/workflows/set_env_vars.sh ${{ matrix.plugin }}
       - name: create conan cache keys
         run: |
           conan config install .github/workflows/conan
@@ -41,7 +45,7 @@ jobs:
             --profile ${{ matrix.profile }} \
             --build missing
           "
-          conan lock create conanfile.py ${CONAN_ARGS}
+          conan lock create conanfile.py ${CONAN_ARGS} ${CONAN_OPTIONS}
       - name: get conan cache
         uses: actions/cache@v2
         id: cache
@@ -52,7 +56,7 @@ jobs:
           key: conan-${{ matrix.profile }}-${{ hashFiles('conan.lock') }}
       - name: Build Dependencies
         if: steps.cache.outputs.cache-hit != 'true'
-        run: conan install . --install-folder build --build missing --build hdf5
+        run: conan install . --install-folder build --build missing --build hdf5 ${CONAN_OPTIONS}
       - name: install conan dependencies
         run: |
           conan install . \
@@ -65,7 +69,9 @@ jobs:
       - name: run tests
         run: |
           cd build
-          export HDF5_PLUGIN_PATH=$(pwd)/plugins
+          if [ "${{ matrix.plugin }}" = "module" ]; then
+            export HDF5_PLUGIN_PATH=$(pwd)/plugins
+          fi
           ctest --extra-verbose --no-tests=error
       - name: build package
         run: |
@@ -73,7 +79,7 @@ jobs:
       - name: upload package
         uses: actions/upload-artifact@v2
         with:
-          name: linux-${{ matrix.profile }}-package
+          name: linux-${{ matrix.profile }}-${{ matrix.plugin }}-package
           path: package/*.deb
   linux-test:
     needs: linux-build
@@ -89,7 +95,7 @@ jobs:
     - name: download linux package
       uses: actions/download-artifact@v2
       with:
-        name: linux-gcc10-package
+        name: linux-gcc10-module-package
         path: package
     - name: install linux package
       run: |
@@ -107,20 +113,22 @@ jobs:
     strategy:
       matrix:
         profile: [vs2019, vs2019-clang]
+        plugin: [static, shared, module]
     runs-on: windows-2019
     steps:
       - name: checkout repository
         uses: actions/checkout@v2
+      - name: set environment variables
+        run: |
+          bash .github/workflows/set_env_vars.sh ${{ matrix.plugin }}
       - name: create conan cache keys
         run: |
           python -m pip install --upgrade pip
           pip install --upgrade conan
           CONAN_ARGS="
             --profile .github/workflows/conan/profiles/${{ matrix.profile }} \
-            --build missing
-          "
-          conan lock create conanfile.py ${CONAN_ARGS} --base --lockfile-out base.lock
-          conan lock create conanfile.py ${CONAN_ARGS}
+            --build missing"
+          conan lock create conanfile.py ${CONAN_ARGS} ${CONAN_OPTIONS}
         shell: bash
       - name: get conan cache
         uses: actions/cache@v2
@@ -128,10 +136,7 @@ jobs:
           path: |
             ~/.conan/data
             !~/.conan/data/**/conan_sources.tgz
-          key: conan-${{ matrix.profile }}-${{ hashfiles('base.lock') }}-${{ hashFiles('conan.lock') }}
-          restore-keys: |
-            conan-${{ matrix.profile }}-${{ hashfiles('base.lock') }}
-            conan-${{ matrix.profile }}
+          key: conan-${{ matrix.profile }}-${{ hashFiles('conan.lock') }}
       - name: install conan dependencies
         run: |
           conan install . \
@@ -153,13 +158,12 @@ jobs:
           ctest --extra-verbose --no-tests=error
       - name: build package
         run: |
-          cat build/CPackConfig.cmake
           cpack -G NSIS -B package --config build/CPackConfig.cmake
         shell: bash
       - name: upload package
         uses: actions/upload-artifact@v2
         with:
-          name: windows-${{ matrix.profile }}-package
+          name: windows-${{ matrix.profile }}-${{ matrix.plugin }}-package
           path: package/*.exe
   windows-test:
     needs: windows-build
@@ -174,7 +178,7 @@ jobs:
         lfs: true
     - uses: actions/download-artifact@v2
       with:
-        name: windows-vs2019-package
+        name: windows-vs2019-module-package
         path: package
     - name: setup python 3
       uses: actions/setup-python@v2

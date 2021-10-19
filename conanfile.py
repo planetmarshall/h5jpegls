@@ -10,10 +10,15 @@ class H5jpeglsConan(ConanFile):
     description = "HDF5 JPEG-LS Compression Filter"
     topics = ("hdf5", "compression")
     settings = "os", "compiler", "build_type", "arch"
-    options = {"fPIC": [True, False]}
+    options = {
+        "fPIC": [True, False],
+        "static_plugin": [True, False],
+        "shared": [True, False]
+    }
     default_options = {
         "fPIC": True,
-        "hdf5:shared": True
+        "static_plugin": False,
+        "shared": False
     }
     generators = "cmake", "cmake_find_package"
     scm = {
@@ -26,6 +31,10 @@ class H5jpeglsConan(ConanFile):
     def config_options(self):
         if self.settings.os == "Windows":
             del self.options.fPIC
+
+    def configure(self):
+        if not self.options.static_plugin:
+            self.options["hdf5"].shared = True
 
     def requirements(self):
         self.requires("hdf5/1.12.0")
@@ -42,6 +51,7 @@ class H5jpeglsConan(ConanFile):
             return self._cmake
 
         self._cmake = CMake(self)
+        self._cmake.definitions["H5JPEGLS_STATIC_PLUGIN"] = self.options.static_plugin
         self._cmake.configure()
         return self._cmake
 
@@ -49,10 +59,6 @@ class H5jpeglsConan(ConanFile):
         with tools.run_environment(self):
             cmake = self._configure_cmake()
             cmake.build()
-
-    def imports(self):
-        self.copy("*.dll", "", "bin")
-        self.copy("*.dylib", "", "lib")
 
     def package(self):
         cmake = self._configure_cmake()

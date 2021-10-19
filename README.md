@@ -43,6 +43,18 @@ Build
    export HDF5_PLUGIN_PATH=$(pwd)/plugins
    ctest --extra-verbose
    ```
+   
+Build as a Library
+------------------
+
+Normally HDF5 Plugins are built as dynamic libraries and discovered by an application at runtime. However
+they can also be built as a library and linked to an application normally. This has the advantage of
+working with both static and shared HDF5 library variants.
+
+To build as a library, configure cmake with `-DH5JPEGLS_STATIC_PLUGIN=ON`
+
+To use the filter as a library it must be manually registered by calling `h5jpegls_register_plugin()`. This
+step is not necessary if using the filter as a dynamic plugin.
 
 Installation
 ------------
