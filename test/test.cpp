@@ -44,7 +44,11 @@ namespace {
         Mx<Scalar> data(rows, cols);
         for (size_t j = 0, block_j = 0; j < blocks_per_row; block_j += static_cast<size_t>(row_blocks[j]), ++j) {
             for (size_t i = 0, block_i = 0; i < blocks_per_column; block_i += static_cast<size_t>(column_blocks[i]), ++i) {
-                data.block(block_j, block_i, row_blocks[j], column_blocks[i]).array() = dist(prg);
+                data.block(
+                        static_cast<Eigen::Index>(block_j),
+                        static_cast<Eigen::Index>(block_i),
+                        row_blocks[j],
+                        column_blocks[i]).array() = static_cast<Scalar>(dist(prg));
             }
         }
 
@@ -220,11 +224,11 @@ TEMPLATE_TEST_CASE("Scenario: valid data can written to an HDF5 file, compressed
             REQUIRE(dset_id >= 0);
             status = H5Dwrite(dset_id, hdf5_type_traits<TestType>::type(), H5S_ALL, H5S_ALL, H5P_DEFAULT, data.data());
             REQUIRE(status >= 0);
-            auto uncompressed_size = data.size() * sizeof(TestType);
+            double uncompressed_size = static_cast<double>(data.size()) * sizeof(TestType);
             THEN("The storage size of the dataset is less than that of the array") {
-                auto storage_size = H5Dget_storage_size(dset_id);
+                auto storage_size = static_cast<double>(H5Dget_storage_size(dset_id));
                 REQUIRE(storage_size > 0);
-                auto compression_ratio = static_cast<double>(uncompressed_size) / static_cast<double>(storage_size);
+                auto compression_ratio = uncompressed_size / storage_size;
                 std::cout << "Compression ratio: " << compression_ratio << "\n";
                 REQUIRE(compression_ratio > 100);
             }
@@ -232,6 +236,7 @@ TEMPLATE_TEST_CASE("Scenario: valid data can written to an HDF5 file, compressed
             status = H5close();
             REQUIRE(status >= 0);
 
+            register_plugin();
             AND_WHEN("The dataset is read back") {
                 file_id = H5Fopen(file_name.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
                 REQUIRE(file_id >= 0);

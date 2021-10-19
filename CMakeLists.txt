@@ -6,7 +6,13 @@ project(h5jpegls
 
 option(H5JPEGLS_STATIC_PLUGIN "Build the library as a static plugin to be linked into an application" OFF)
 if (H5JPEGLS_STATIC_PLUGIN)
-    message(STATUS "H5JPEGLS: Building Static Plugin")
+    if (CMAKE_BUILD_SHARED)
+        message(STATUS "H5JPEGLS: Building Plugin as library (Shared)")
+    else()
+        message(STATUS "H5JPEGLS: Building Plugin as library (Static)")
+    endif()
+else()
+    message(STATUS "H5JPEGLS: Building Plugin as dynamic module")
 endif()
 
 if (EXISTS "${CMAKE_BINARY_DIR}/conanbuildinfo.cmake")

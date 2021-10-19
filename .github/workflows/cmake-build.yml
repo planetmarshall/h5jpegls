@@ -158,7 +158,6 @@ jobs:
           ctest --extra-verbose --no-tests=error
       - name: build package
         run: |
-          cat build/CPackConfig.cmake
           cpack -G NSIS -B package --config build/CPackConfig.cmake
         shell: bash
       - name: upload package
