@@ -5,7 +5,10 @@
 
 #include <hdf5.h>
 #include <catch2/catch.hpp>
+#pragma warning( push )
+#pragma warning( disable : 4127 )
 #include <Eigen/Core>
+#pragma warning( pop )
 
 #include <filesystem>
 #include <iostream>
@@ -141,7 +144,7 @@ TEMPLATE_TEST_CASE("Scenario: the filter can only be applied to compatible integ
     const hsize_t rank = 2;
     GIVEN("A 2D dataset") {
         std::array<hsize_t, rank> dimensions{dim, dim};
-        space_id = H5Screate_simple(dimensions.size(), dimensions.data(), NULL);
+        space_id = H5Screate_simple(static_cast<int>(dimensions.size()), dimensions.data(), NULL);
         REQUIRE(space_id >= 0);
         WHEN("The dataset is created of 32 bit integer type") {
             THEN("The filter cannot be applied") {
@@ -150,7 +153,7 @@ TEMPLATE_TEST_CASE("Scenario: the filter can only be applied to compatible integ
                 status = H5Pset_filter(dcpl_id, jpegls_filter_id, H5Z_FLAG_MANDATORY, 0, NULL);
                 REQUIRE(status >= 0);
                 std::array<hsize_t, rank> chunk{dim, dim};
-                status = H5Pset_chunk(dcpl_id, chunk.size(), chunk.data());
+                status = H5Pset_chunk(dcpl_id, static_cast<int>(chunk.size()), chunk.data());
                 REQUIRE(status >= 0);
                 dset_id = H5Dcreate(file_id, dataset_name, hdf5_type_traits<TestType>::type(), space_id, H5P_DEFAULT, dcpl_id, H5P_DEFAULT);
                 REQUIRE(dset_id < 0);
