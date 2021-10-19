@@ -56,7 +56,7 @@ jobs:
           key: conan-${{ matrix.profile }}-${{ hashFiles('conan.lock') }}
       - name: Build Dependencies
         if: steps.cache.outputs.cache-hit != 'true'
-        run: conan install . --install-folder build --build missing --build hdf5
+        run: conan install . --install-folder build --build missing --build hdf5 ${CONAN_OPTIONS}
       - name: install conan dependencies
         run: |
           conan install . \
@@ -69,7 +69,7 @@ jobs:
       - name: run tests
         run: |
           cd build
-          if [ "${{ matrix.plugin }}" = "module"]; then
+          if [ "${{ matrix.plugin }}" = "module" ]; then
             export HDF5_PLUGIN_PATH=$(pwd)/plugins
           fi
           ctest --extra-verbose --no-tests=error
