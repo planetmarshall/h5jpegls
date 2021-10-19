@@ -1,4 +1,4 @@
-#include "h5jpegls.h"
+#include <h5jpegls/h5jpegls.h>
 #include <H5Zpublic.h>
 #include <hdf5.h>
 #include <charls/charls.h>

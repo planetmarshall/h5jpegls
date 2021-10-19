@@ -1,6 +1,6 @@
 #define CATCH_CONFIG_MAIN
 #ifdef H5JPEGLS_STATIC_PLUGIN
-#include <h5jpegls.h>
+#include <h5jpegls/h5jpegls.h>
 #endif
 
 #include <hdf5.h>

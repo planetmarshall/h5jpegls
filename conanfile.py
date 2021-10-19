@@ -18,7 +18,7 @@ class H5jpeglsConan(ConanFile):
     default_options = {
         "fPIC": True,
         "static_plugin": False,
-        "shared": True
+        "shared": False
     }
     generators = "cmake", "cmake_find_package"
     scm = {
