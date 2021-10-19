@@ -6,6 +6,7 @@ if (H5JPEGLS_STATIC_PLUGIN)
             $<INSTALL_INTERFACE:include>
             )
     set(H5JPEGLS_PLUGIN_DESTINATION lib)
+    set_target_properties(h5jpegls PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON)
 else()
     add_library(h5jpegls MODULE ${H5JPEGLS_SOURCES})
     target_include_directories(h5jpegls PRIVATE ${CMAKE_SOURCE_DIR}/include)

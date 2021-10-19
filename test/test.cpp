@@ -174,7 +174,7 @@ SCENARIO("The filter can only be applied to 2D datasets", "[plugin]") {
     const hsize_t rank = 3;
     GIVEN("A 3D dataset") {
         std::array<hsize_t, rank> dimensions{dim, dim, dim};
-        space_id = H5Screate_simple(dimensions.size(), dimensions.data(), NULL);
+        space_id = H5Screate_simple(static_cast<int>(dimensions.size()), dimensions.data(), NULL);
         REQUIRE(space_id >= 0);
         WHEN("The dataset is created") {
             THEN("The filter cannot be applied") {
@@ -183,7 +183,7 @@ SCENARIO("The filter can only be applied to 2D datasets", "[plugin]") {
                 status = H5Pset_filter(dcpl_id, jpegls_filter_id, H5Z_FLAG_MANDATORY, 0, NULL);
                 REQUIRE(status >= 0);
                 std::array<hsize_t, rank> chunk{dim, dim, dim};
-                status = H5Pset_chunk(dcpl_id, chunk.size(), chunk.data());
+                status = H5Pset_chunk(dcpl_id, static_cast<int>(chunk.size()), chunk.data());
                 REQUIRE(status >= 0);
                 dset_id = H5Dcreate(file_id, dataset_name, hdf5_type_traits<uint8_t>::type(), space_id, H5P_DEFAULT, dcpl_id, H5P_DEFAULT);
                 REQUIRE(dset_id < 0);
@@ -210,7 +210,7 @@ TEMPLATE_TEST_CASE("Scenario: valid data can written to an HDF5 file, compressed
         constexpr hsize_t cols = 721;
         auto data = test_data<TestType>(rows, cols);
         std::array<hsize_t, 2> dimensions{rows, cols};
-        space_id = H5Screate_simple(dimensions.size(), dimensions.data(), NULL);
+        space_id = H5Screate_simple(static_cast<int>(dimensions.size()), dimensions.data(), NULL);
         REQUIRE(space_id >= 0);
         WHEN("The array is written to a dataset in a single chunk") {
             dcpl_id = H5Pcreate(H5P_DATASET_CREATE);
@@ -218,7 +218,7 @@ TEMPLATE_TEST_CASE("Scenario: valid data can written to an HDF5 file, compressed
             status = H5Pset_filter(dcpl_id, jpegls_filter_id, H5Z_FLAG_MANDATORY, 0, NULL);
             REQUIRE(status >= 0);
             std::array<hsize_t, 2> chunk{rows, cols};
-            status = H5Pset_chunk(dcpl_id, chunk.size(), chunk.data());
+            status = H5Pset_chunk(dcpl_id, static_cast<int>(chunk.size()), chunk.data());
             REQUIRE(status >= 0);
             dset_id = H5Dcreate(file_id, dataset_name, hdf5_type_traits<TestType>::type(), space_id, H5P_DEFAULT, dcpl_id, H5P_DEFAULT);
             REQUIRE(dset_id >= 0);
