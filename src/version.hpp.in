@@ -1,0 +1,11 @@
+#ifndef H5JPEGLS_VERSION_H
+#define H5JPEGLS_VERSION_H
+
+#include <string_view>
+
+namespace h5jpegls {
+    constexpr std::string_view version() { return "@H5JPEGLS_VERSION@"; }
+    constexpr std::string_view description() { return "@H5JPEGLS_DESCRIPTION@"; }
+}
+
+#endif // H5JPEGLS_VERSION_H

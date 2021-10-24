@@ -1,4 +1,6 @@
 #include <h5jpegls/h5jpegls.h>
+#include "version.hpp"
+
 #include <H5Zpublic.h>
 #pragma warning( push )
 #pragma warning( disable : 4768 )
@@ -197,7 +199,7 @@ extern "C" const H5Z_class2_t H5Z_JPEGLS[1] = {{
     (H5Z_filter_t)H5Z_FILTER_JPEGLS,         /* Filter id number */
     1,              /* encoder_present flag (set to true) */
     1,              /* decoder_present flag (set to true) */
-    "HDF5 JPEG-LS filter v1.0.0 <https://github.com/planetmarshall/jpegls-hdf-filter>", /* Filter name for debugging */
+    h5jpegls::description().data(),
     can_apply_filter,           /* The "can apply" callback     */
     h5jpegls_set_local,           /* The "set local" callback */
     codec_filter,         /* The actual filter function */
