@@ -2,10 +2,13 @@
 #include "version.hpp"
 
 #include <H5Zpublic.h>
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunknown-pragmas"
 #pragma warning( push )
 #pragma warning( disable : 4768 )
 #include <hdf5.h>
 #pragma warning( pop )
+#pragma GCC diagnostic pop
 #include <charls/charls.h>
 
 #include <array>
