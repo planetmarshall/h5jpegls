@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.15)
 project(h5jpegls 
     VERSION 1.0.0
     HOMEPAGE_URL https://github.com/planetmarshall/jpegls-hdf-filter
+    DESCRIPTION "JPEG-LS Compression Filter"
     LANGUAGES CXX)
 
 option(H5JPEGLS_STATIC_PLUGIN "Build the library as a static plugin to be linked into an application" OFF)
@@ -20,6 +21,10 @@ if (EXISTS "${CMAKE_BINARY_DIR}/conanbuildinfo.cmake")
     conan_basic_setup(NO_OUTPUT_DIRS)
     list(PREPEND CMAKE_MODULE_PATH ${CMAKE_BINARY_DIR})
 endif()
+
+list(PREPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
+include(h5jpegls_version)
+h5jpegls_configure_version_file(${CMAKE_CURRENT_SOURCE_DIR}/src/version.hpp.in ${CMAKE_CURRENT_SOURCE_DIR}/src/version.hpp)
 
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
