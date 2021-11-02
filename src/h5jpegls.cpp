@@ -32,17 +32,19 @@ struct LegacyCodecParameters {
 
 struct CodecParameters {
     static CodecParameters from_array(const unsigned int params[]) {
-        return {
-            .chunk_m = params[0], .chunk_n = params[1], .bits_per_element = params[2], .divisions_m = params[3], .divisions_n = params[4]};
+        return { .chunk_m = params[0], .chunk_n = params[1], .bits_per_element = params[2], .num_components = params[3] };
     }
 
     unsigned int chunk_m{};
     unsigned int chunk_n{};
     unsigned int bits_per_element{};
-    unsigned int divisions_m = 1;
-    unsigned int divisions_n = 1;
+    unsigned int num_components = 1;
 
-    [[nodiscard]] std::array<unsigned int, 5> elements() const { return {chunk_m, chunk_n, bits_per_element, divisions_m, divisions_n}; }
+    [[nodiscard]] std::array<unsigned int, 4> elements() const {
+        return {
+            chunk_m, chunk_n, bits_per_element, num_components
+        };
+    }
 };
 
 size_t decode(void **buffer, size_t *buffer_size, size_t data_size, const CodecParameters &) {
@@ -89,11 +91,16 @@ size_t decode_legacy(void **buffer, size_t *buffer_size, const LegacyCodecParame
 
 size_t encode(void **buffer, size_t *buffer_size, size_t data_size, const CodecParameters &parameters) {
     charls::jpegls_encoder encoder;
-    charls::frame_info frame{.width = parameters.chunk_n,
-                             .height = parameters.chunk_m,
-                             .bits_per_sample = static_cast<int32_t>(parameters.bits_per_element),
-                             .component_count = 1};
+    charls::frame_info frame{
+        .width = parameters.chunk_n,
+        .height = parameters.chunk_m,
+        .bits_per_sample = static_cast<int32_t>(parameters.bits_per_element),
+        .component_count = static_cast<int32_t>(parameters.num_components)
+    };
     encoder.frame_info(frame);
+    if (frame.component_count > 1) {
+        encoder.interleave_mode(charls::interleave_mode::Sample);
+    }
     std::vector<uint8_t> encoding_buffer(*buffer_size);
     encoder.destination(encoding_buffer);
     auto num_encoded_bytes = encoder.encode(*buffer, data_size);
@@ -107,7 +114,7 @@ htri_t can_apply_filter(hid_t dcpl_id, hid_t type_id, hid_t) {
     constexpr hsize_t max_rank = 32;
     std::array<hsize_t, max_rank> chunk_dimensions{};
     auto rank = H5Pget_chunk(dcpl_id, 32, chunk_dimensions.data());
-    if (rank != 2) {
+    if (rank != 2 && rank != 3) {
         return 0;
     }
     auto type_class = H5Tget_class(type_id);
@@ -131,7 +138,7 @@ size_t codec_filter(unsigned int flags, size_t num_parameters, const unsigned in
 
     try {
         if (flags & H5Z_FLAG_REVERSE) {
-            if (num_parameters == 5) {
+            if (num_parameters == 4) {
                 return decode(buf, buf_size, nbytes, CodecParameters::from_array(parameters));
             }
             return decode_legacy(buf, buf_size, LegacyCodecParameters::from_array(parameters));
@@ -162,8 +169,15 @@ herr_t h5jpegls_set_local(hid_t dcpl_id, hid_t type_id, hid_t) {
         return -1;
     }
 
-    CodecParameters parameters{.chunk_m = static_cast<unsigned int>(chunk_dimensions[0]),
-                               .chunk_n = static_cast<unsigned int>(chunk_dimensions[1])};
+    CodecParameters parameters{
+        .chunk_m = static_cast<unsigned int>(chunk_dimensions[0]),
+        .chunk_n = static_cast<unsigned int>(chunk_dimensions[1]),
+    };
+    if (rank == 2) {
+        parameters.num_components = 1;
+    } else {
+        parameters.num_components = static_cast<unsigned int>(chunk_dimensions[2]);
+    }
 
     if (num_user_parameters > 0) {
         parameters.bits_per_element = user_parameters[0];
@@ -179,11 +193,6 @@ herr_t h5jpegls_set_local(hid_t dcpl_id, hid_t type_id, hid_t) {
             return -1;
         }
         parameters.bits_per_element = bytes_per_element * 8;
-    }
-
-    if (num_user_parameters == 3) {
-        parameters.divisions_m = user_parameters[1];
-        parameters.divisions_m = user_parameters[2];
     }
 
     auto cd_values = parameters.elements();

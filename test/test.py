@@ -38,7 +38,27 @@ def test_compress_greyscale(dataset):
 
     compression_ratio = uncompressed_size / compressed_size
     print(f"compression ratio: {compression_ratio:.3f}:1")
-    assert compression_ratio > 1.5
+    assert compression_ratio > 1
+    assert np.count_nonzero(test_raw - test_compressed) == 0
+
+
+def test_compress_rgb():
+    dataset = "test8_rgb"
+    with h5py.File(data_file("test.h5")) as h5:
+        test_dataset = h5[dataset]
+        test_raw = np.array(test_dataset)
+        uncompressed_size = test_dataset.id.get_storage_size()
+    with TemporaryDirectory() as tempdir:
+        dest_file = os.path.join(tempdir, "test_compressed.h5")
+        repack(dataset, data_file("test.h5"), dest_file)
+        with h5py.File(dest_file) as h5:
+            test8 = h5[dataset]
+            compressed_size = test8.id.get_storage_size()
+            test_compressed = np.array(test8)
+
+    compression_ratio = uncompressed_size / compressed_size
+    print(f"compression ratio: {compression_ratio:.3f}:1")
+    assert compression_ratio > 1
     assert np.count_nonzero(test_raw - test_compressed) == 0
 
 

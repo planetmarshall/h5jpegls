@@ -145,7 +145,7 @@ TEMPLATE_TEST_CASE("Scenario: the filter can only be applied to compatible integ
     cleanup(file_id, space_id, dset_id, dcpl_id);
 }
 
-SCENARIO("The filter can only be applied to 2D datasets", "[plugin]") {
+SCENARIO("The filter can only be applied to 2D or 3D datasets", "[plugin]") {
     register_plugin();
     auto file_name = temp_file().string();
     hid_t file_id = -1;
@@ -156,9 +156,9 @@ SCENARIO("The filter can only be applied to 2D datasets", "[plugin]") {
     herr_t status;
     file_id = H5Fcreate(file_name.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
     const hsize_t dim = 4;
-    const hsize_t rank = 3;
-    GIVEN("A 3D dataset") {
-        std::array<hsize_t, rank> dimensions{dim, dim, dim};
+    const hsize_t rank = 4;
+    GIVEN("A 4D dataset") {
+        std::array<hsize_t, rank> dimensions{dim, dim, dim, dim};
         space_id = H5Screate_simple(static_cast<int>(dimensions.size()), dimensions.data(), NULL);
         REQUIRE(space_id >= 0);
         WHEN("The dataset is created") {
@@ -167,7 +167,7 @@ SCENARIO("The filter can only be applied to 2D datasets", "[plugin]") {
                 REQUIRE(dcpl_id >= 0);
                 status = H5Pset_filter(dcpl_id, jpegls_filter_id, H5Z_FLAG_MANDATORY, 0, NULL);
                 REQUIRE(status >= 0);
-                std::array<hsize_t, rank> chunk{dim, dim, dim};
+                std::array<hsize_t, rank> chunk{dim, dim, dim, dim};
                 status = H5Pset_chunk(dcpl_id, static_cast<int>(chunk.size()), chunk.data());
                 REQUIRE(status >= 0);
                 dset_id = H5Dcreate(file_id, dataset_name, hdf5_type_traits<uint8_t>::type(), space_id, H5P_DEFAULT, dcpl_id, H5P_DEFAULT);
@@ -237,6 +237,62 @@ TEMPLATE_TEST_CASE("Scenario: valid data can written to an HDF5 file, compressed
                     AND_THEN("The data is identical to the original") {
                         std::vector<TestType> actual_data(rows * cols);
                         status = H5Dread(dset_id, hdf5_type_traits<TestType>::type(), H5S_ALL, H5S_ALL, H5P_DEFAULT, actual_data.data());
+                        REQUIRE(status >= 0);
+                        REQUIRE(data == actual_data);
+                    }
+                }
+            }
+        }
+    }
+    GIVEN("A 3D array of integers") {
+        constexpr hsize_t rows = 29;
+        constexpr hsize_t cols = 13;
+        constexpr hsize_t channels = 3;
+        auto data = test_data<TestType>(rows, cols, channels);
+        std::array<hsize_t, 3> dimensions{rows, cols, channels};
+        space_id = H5Screate_simple(static_cast<int>(dimensions.size()), dimensions.data(), NULL);
+        REQUIRE(space_id >= 0);
+        WHEN("The array is written to a dataset in a single chunk") {
+            dcpl_id = H5Pcreate(H5P_DATASET_CREATE);
+            REQUIRE(dcpl_id >= 0);
+            status = H5Pset_filter(dcpl_id, jpegls_filter_id, H5Z_FLAG_MANDATORY, 0, NULL);
+            REQUIRE(status >= 0);
+            std::array<hsize_t, 3> chunk{rows, cols, channels};
+            status = H5Pset_chunk(dcpl_id, static_cast<int>(chunk.size()), chunk.data());
+            REQUIRE(status >= 0);
+            dset_id = H5Dcreate(file_id, dataset_name, hdf5_type_traits<TestType>::type(), space_id, H5P_DEFAULT, dcpl_id, H5P_DEFAULT);
+            REQUIRE(dset_id >= 0);
+            status = H5Dwrite(dset_id, hdf5_type_traits<TestType>::type(), H5S_ALL, H5S_ALL, H5P_DEFAULT, data.data());
+            REQUIRE(status >= 0);
+            double uncompressed_size = static_cast<double>(data.size()) * sizeof(TestType);
+            THEN("The storage size of the dataset is less than that of the array") {
+                auto storage_size = static_cast<double>(H5Dget_storage_size(dset_id));
+                REQUIRE(storage_size > 0);
+                auto compression_ratio = uncompressed_size / storage_size;
+                std::cout << "Compression ratio: " << compression_ratio << "\n";
+                REQUIRE(compression_ratio > 1);
+            }
+            cleanup(file_id, space_id, dset_id, dcpl_id);
+            status = H5close();
+            REQUIRE(status >= 0);
+
+            register_plugin();
+            AND_WHEN("The dataset is read back") {
+                file_id = H5Fopen(file_name.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
+                REQUIRE(file_id >= 0);
+                dset_id = H5Dopen(file_id, dataset_name, H5P_DEFAULT);
+                REQUIRE(dset_id >= 0);
+                dcpl_id = H5Dget_create_plist(dset_id);
+                REQUIRE(dcpl_id >= 0);
+                THEN("The filter has been applied") {
+                    const auto [filter_id, filter_name] = get_filter_info(dcpl_id);
+                    REQUIRE(filter_id == jpegls_filter_id);
+                    std::cout << "Filter info: " << filter_name << "\n";
+
+                    AND_THEN("The data is identical to the original") {
+                        std::vector<TestType> actual_data(rows * cols * channels);
+                        status =
+                            H5Dread(dset_id, hdf5_type_traits<TestType>::type(), H5S_ALL, H5S_ALL, H5P_DEFAULT, actual_data.data());
                         REQUIRE(status >= 0);
                         REQUIRE(data == actual_data);
                     }
