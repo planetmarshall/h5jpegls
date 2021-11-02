@@ -33,6 +33,13 @@ jobs:
       image: ${{ matrix.image }}
       options: '--user=root'
     steps:
+      - name: install prerequisites
+        run: |
+          apt update
+          apt-get install -y --no-install-recommends software-properties-common
+          add-apt-repository ppa:git-core/ppa
+          apt update
+          apt-get install -y --no-install-recommends git
       - name: checkout repository
         uses: actions/checkout@v2
       - name: set environment variables
