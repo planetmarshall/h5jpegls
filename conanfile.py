@@ -68,6 +68,7 @@ class H5jpeglsConan(ConanFile):
     def package(self):
         cmake = self._configure_cmake()
         cmake.install()
+        self.copy("LICENSE.txt", src=self.source_folder, dst="licenses")
 
     def package_info(self):
         self.cpp_info.libs = ["h5jpegls"]
