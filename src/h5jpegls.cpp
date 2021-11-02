@@ -221,6 +221,10 @@ extern "C" const void *H5PLget_plugin_info(void) {
     return H5Z_JPEGLS;
 }
 
+void h5jpegls::register_plugin() {
+    h5jpegls_register_plugin();
+}
+
 void h5jpegls_register_plugin() {
     H5Zregister(H5Z_JPEGLS);
 }

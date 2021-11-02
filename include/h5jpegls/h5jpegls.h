@@ -4,6 +4,9 @@
 #include <H5PLextern.h>
 
 #ifdef __cplusplus
+namespace h5jpegls {
+    void register_plugin();
+}
 extern "C" {
 #endif
 void h5jpegls_register_plugin(void);
