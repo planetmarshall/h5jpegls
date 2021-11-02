@@ -68,7 +68,8 @@ jobs:
         run: |
           conan create . \
             --lockfile conan.lock \
-            --build missing
+            --build missing \
+            --build h5jpegls
   windows-build:
     strategy:
       matrix:
@@ -101,5 +102,6 @@ jobs:
         run: |
           conan create . \
             --lockfile conan.lock \
-            --build missing
+            --build missing \
+            --build h5jpegls
         shell: bash
