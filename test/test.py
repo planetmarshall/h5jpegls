@@ -31,14 +31,18 @@ def test_compress_greyscale(dataset):
     with TemporaryDirectory() as tempdir:
         dest_file = os.path.join(tempdir, "test_compressed.h5")
         repack(dataset, data_file("test.h5"), dest_file)
-        with h5py.File(dest_file) as h5:
+        with h5py.File(dest_file, "a") as h5:
             test8 = h5[dataset]
             compressed_size = test8.id.get_storage_size()
+            test8gz = h5.create_dataset(dataset + "gz", data=test8, compression="gzip")
+            gzip_compressed_size = test8gz.id.get_storage_size()
             test_compressed = np.array(test8)
 
     compression_ratio = uncompressed_size / compressed_size
+    gzip_compression_ratio = uncompressed_size / gzip_compressed_size
     print(f"compression ratio: {compression_ratio:.3f}:1")
-    assert compression_ratio > 1
+    print(f"GZIP compression ratio: {gzip_compression_ratio:.3f}:1")
+    assert compressed_size < gzip_compressed_size
     assert np.count_nonzero(test_raw - test_compressed) == 0
 
 
@@ -51,14 +55,18 @@ def test_compress_rgb():
     with TemporaryDirectory() as tempdir:
         dest_file = os.path.join(tempdir, "test_compressed.h5")
         repack(dataset, data_file("test.h5"), dest_file)
-        with h5py.File(dest_file) as h5:
+        with h5py.File(dest_file, "a") as h5:
             test8 = h5[dataset]
+            test8gz = h5.create_dataset(dataset + "gz", data=test8, compression="gzip")
+            gzip_compressed_size = test8gz.id.get_storage_size()
             compressed_size = test8.id.get_storage_size()
             test_compressed = np.array(test8)
 
     compression_ratio = uncompressed_size / compressed_size
+    gzip_compression_ratio = uncompressed_size / gzip_compressed_size
     print(f"compression ratio: {compression_ratio:.3f}:1")
-    assert compression_ratio > 1
+    print(f"GZIP compression ratio: {gzip_compression_ratio:.3f}:1")
+    assert compressed_size < gzip_compressed_size
     assert np.count_nonzero(test_raw - test_compressed) == 0
 
 
