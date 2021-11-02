@@ -37,7 +37,7 @@ jobs:
         uses: actions/checkout@v2
       - name: set environment variables
         run: |
-          bash .github/workflows/set_env_vars.sh ${{ matrix.plugin }}
+          bash .github/workflows/set_env_vars_package.sh ${{ matrix.plugin }}
       - name: create conan cache keys
         run: |
           conan config install .github/workflows/conan
@@ -73,7 +73,7 @@ jobs:
         uses: actions/checkout@v2
       - name: set environment variables
         run: |
-          bash .github/workflows/set_env_vars.sh ${{ matrix.plugin }}
+          bash .github/workflows/set_env_vars_package.sh ${{ matrix.plugin }}
       - name: create conan cache keys
         run: |
           python -m pip install --upgrade pip
