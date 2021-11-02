@@ -2,6 +2,7 @@ JPEG-LS HDF5 Filter
 ===================
 
 ![CI Build](https://github.com/planetmarshall/jpegls-hdf-filter/actions/workflows/cmake-build.yml/badge.svg)
+![Conan Package Build](https://github.com/planetmarshall/jpegls-hdf-filter/actions/workflows/conan-package.yml/badge.svg)
 
 The JPEG-LS HDF5 filter allows the compression of HDF5 datasets using the 
 [JPEG-LS](https://jpeg.org/jpegls/) codec. It is based
