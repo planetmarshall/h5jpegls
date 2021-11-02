@@ -2,13 +2,10 @@
 #include "version.hpp"
 
 #include <H5Zpublic.h>
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunknown-pragmas"
 #pragma warning( push )
 #pragma warning( disable : 4768 )
 #include <hdf5.h>
 #pragma warning( pop )
-#pragma GCC diagnostic pop
 #include <charls/charls.h>
 
 #include <array>
@@ -164,7 +161,7 @@ herr_t h5jpegls_set_local(hid_t dcpl_id, hid_t type_id, hid_t) {
     }
 
     std::array<hsize_t, 32> chunk_dimensions{};
-    int rank = H5Pget_chunk(dcpl_id, chunk_dimensions.size(), chunk_dimensions.data());
+    int rank = H5Pget_chunk(dcpl_id, static_cast<int>(chunk_dimensions.size()), chunk_dimensions.data());
     if (rank < 0) {
         return -1;
     }

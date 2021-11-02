@@ -3,7 +3,10 @@
 #include <h5jpegls/h5jpegls.h>
 #endif
 
+#pragma warning( push )
+#pragma warning( disable : 4768 )
 #include <hdf5.h>
+#pragma warning( pop )
 #include <catch2/catch.hpp>
 
 #include <filesystem>
