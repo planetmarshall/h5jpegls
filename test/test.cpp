@@ -5,19 +5,14 @@
 
 #include <hdf5.h>
 #include <catch2/catch.hpp>
-#pragma warning( push )
-#pragma warning( disable : 4127 )
-#include <Eigen/Core>
-#pragma warning( pop )
 
 #include <filesystem>
 #include <iostream>
 #include <random>
+#include <vector>
+#include <array>
 
 const int jpegls_filter_id = 32012;
-
-template<typename Scalar>
-using Mx = Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
 namespace fs = std::filesystem;
 
 namespace {
@@ -31,30 +26,17 @@ namespace {
     }
 
     template<typename Scalar>
-    Mx<Scalar> test_data(Eigen::Index rows, Eigen::Index cols) {
-        std::mt19937 prg{0};
-        std::uniform_int_distribution<int64_t> dist(std::numeric_limits<Scalar>::lowest(), std::numeric_limits<Scalar>::max());
-        constexpr Eigen::Index blocks_per_row = 4;
-        constexpr Eigen::Index blocks_per_column = 4;
-        Eigen::Index row_block_size = rows / blocks_per_row;
-        std::array<Eigen::Index, blocks_per_row>
-            row_blocks{row_block_size, row_block_size, row_block_size, rows - (blocks_per_row - 1) * row_block_size};
-
-        Eigen::Index column_block_size = cols / blocks_per_column;
-        std::array<Eigen::Index, blocks_per_column>
-            column_blocks{column_block_size, column_block_size, column_block_size, cols - (blocks_per_column - 1) * column_block_size};
-
-        Mx<Scalar> data(rows, cols);
-        for (size_t j = 0, block_j = 0; j < blocks_per_row; block_j += static_cast<size_t>(row_blocks[j]), ++j) {
-            for (size_t i = 0, block_i = 0; i < blocks_per_column; block_i += static_cast<size_t>(column_blocks[i]), ++i) {
-                data.block(
-                        static_cast<Eigen::Index>(block_j),
-                        static_cast<Eigen::Index>(block_i),
-                        row_blocks[j],
-                        column_blocks[i]).array() = static_cast<Scalar>(dist(prg));
+    std::vector<Scalar> test_data(size_t rows, size_t cols, size_t channels) {
+        std::vector<Scalar> data(rows * cols * channels);
+        for ( size_t j = 0; j < rows; ++j) {
+            size_t row_offset = j * cols;
+            for ( size_t i = 0; i < cols; ++i ) {
+                size_t col_offset = row_offset + (i * channels);
+                for (size_t p = 0; p < channels; ++p) {
+                    data[col_offset + p] = static_cast<Scalar>((col_offset + p) % std::numeric_limits<Scalar>::max());
+                }
             }
         }
-
         return data;
     }
 
@@ -211,7 +193,7 @@ TEMPLATE_TEST_CASE("Scenario: valid data can written to an HDF5 file, compressed
     GIVEN("A 2D array of integers") {
         constexpr hsize_t rows = 943;
         constexpr hsize_t cols = 721;
-        auto data = test_data<TestType>(rows, cols);
+        auto data = test_data<TestType>(rows, cols, 1);
         std::array<hsize_t, 2> dimensions{rows, cols};
         space_id = H5Screate_simple(static_cast<int>(dimensions.size()), dimensions.data(), NULL);
         REQUIRE(space_id >= 0);
@@ -233,7 +215,7 @@ TEMPLATE_TEST_CASE("Scenario: valid data can written to an HDF5 file, compressed
                 REQUIRE(storage_size > 0);
                 auto compression_ratio = uncompressed_size / storage_size;
                 std::cout << "Compression ratio: " << compression_ratio << "\n";
-                REQUIRE(compression_ratio > 100);
+                REQUIRE(compression_ratio > 1);
             }
             cleanup(file_id, space_id, dset_id, dcpl_id);
             status = H5close();
@@ -253,10 +235,10 @@ TEMPLATE_TEST_CASE("Scenario: valid data can written to an HDF5 file, compressed
                     std::cout << "Filter info: " << filter_name << "\n";
 
                     AND_THEN("The data is identical to the original") {
-                        Mx<TestType> actual_data(rows, cols);
+                        std::vector<TestType> actual_data(rows * cols);
                         status = H5Dread(dset_id, hdf5_type_traits<TestType>::type(), H5S_ALL, H5S_ALL, H5P_DEFAULT, actual_data.data());
                         REQUIRE(status >= 0);
-                        REQUIRE(!(data - actual_data).any());
+                        REQUIRE(data == actual_data);
                     }
                 }
             }
