@@ -11,14 +11,18 @@ on original work by _Frans van den Bergh_ and _Derick Swanepoel_. The
 This implementation remains backward-compatible with the original version and so retains 
 the [registered filter](https://portal.hdfgroup.org/display/support/Filters) ID `32012`.
 
+The filter supports datasets chunked in both 2 and 3 dimensions. For chunks of dimension
+`MxNxP`, `M` is interpreted as the height, `N` as the width and `P` as the number of 
+components. Sample Interleaving is used for datasets with `P>1`
+
+For example usage see `test.cpp` and `test.py`
+
 Limitations
 -----------
 
 * Only integer typed datasets of up to 16 bits in size are supported. This reflects the 
   features of the JPEG-LS Codec. For other datasets other compression algorithms, such 
   as [ZFP](https://github.com/LLNL/H5Z-ZFP) may be more suitable.
-* Only datasets chunked in 2 dimensions are supported (ie, greyscale images). Multi-component
-  images will be supported in a future release.
 
 Build
 -----
