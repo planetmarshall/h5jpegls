@@ -34,15 +34,17 @@ Build
 2. Install dependencies
    ```
    mkdir build
-   conan install . -if build --build missing
+   conan install . -if build \
+     -o enable_tests=True \
+     -o static_plugin=False
    ```
-3. Build with cmake
+2. Build with cmake
    ```
    cd build
    cmake .. -D CMAKE_BUILD_TYPE=Release
    cmake --build .
    ```
-4. Run tests
+3. Run tests
    ```
    cd build
    export HDF5_PLUGIN_PATH=$(pwd)/plugins
@@ -60,6 +62,13 @@ To build as a library, configure cmake with `-DH5JPEGLS_STATIC_PLUGIN=ON`
 
 To use the filter as a library it must be manually registered by calling `h5jpegls_register_plugin()`. This
 step is not necessary if using the filter as a dynamic plugin.
+
+### Conan Package
+
+For easier consumption of the filter as a library, you can build a conan package with 
+```
+$ conan create . --build missing
+```
 
 Installation
 ------------
