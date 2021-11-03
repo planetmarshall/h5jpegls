@@ -1,6 +1,7 @@
 set(H5JPEGLS_SOURCES h5jpegls.cpp version.hpp ${CMAKE_SOURCE_DIR}/include/h5jpegls/h5jpegls.h)
 if (H5JPEGLS_STATIC_PLUGIN)
     add_library(h5jpegls h5jpegls.cpp ${H5JPEGLS_SOURCES})
+    set_target_properties(h5jpegls PROPERTIES PUBLIC_HEADER ${CMAKE_SOURCE_DIR}/include/h5jpegls/h5jpegls.h)
     target_include_directories(h5jpegls PUBLIC
             $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include>
             $<INSTALL_INTERFACE:include>
@@ -34,4 +35,5 @@ install(
         TARGETS h5jpegls
         EXPORT h5jpegls_targets
         LIBRARY DESTINATION ${H5JPEGLS_PLUGIN_DESTINATION}
+        PUBLIC_HEADER DESTINATION include/h5jpegls
 )
