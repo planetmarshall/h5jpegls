@@ -250,8 +250,8 @@ jobs:
         id: cache
         with:
           path: |
-            /home/conan/.conan/data
-            !/home/conan/.conan/data/**/conan_sources.tgz
+            ~/.conan/data
+            !~/.conan/data/**/conan_sources.tgz
           key: conan-${{ matrix.profile }}-${{ hashFiles('conan.lock') }}
       - name: install conan dependencies
         run: |
