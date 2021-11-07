@@ -1,8 +1,6 @@
 name: cmake-build
 on:
   push:
-    branches:
-      - main
   pull_request:
     branches:
       - main
@@ -272,37 +270,29 @@ jobs:
       - name: build package
         if: ${{ matrix.plugin == 'module' }}
         run: |
-          cpack -G DragNDrop -B $(pwd)/package --config build/CPackConfig.cmake
+          cpack -G TXZ -B $(pwd)/package --config build/CPackConfig.cmake
       - name: upload package
         if: ${{ matrix.plugin == 'module' }}
         uses: actions/upload-artifact@v2
         with:
           name: macos-${{ matrix.profile }}-package
-          path: package/*.dmg
+          path: package/*.xz
 
   macos-test:
     needs: macos-build
-    runs-on: ubuntu-20.04
+    runs-on: macos-11
     steps:
       - name: checkout repository
         uses: actions/checkout@v2
         with:
           lfs: true
-      - name: compile and install HDF5
+      - name: setup python 3
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.9'
+      - name: install HDF5
         run: |
-          wget https://github.com/HDFGroup/hdf5/archive/refs/tags/hdf5-1_12_1.tar.gz
-          tar -xf hdf5-1_12_1.tar.gz
-          cd hdf5-hdf5-1_12_1
-          mkdir build
-          cd build
-          cmake .. -DCMAKE_BUILD_TYPE=Release \
-            -DBUILD_STATIC_LIBS=OFF \
-            -DBUILD_TESTING=OFF \
-            -DHDF5_BUILD_EXAMPLES=OFF \
-            -DHDF5_BUILD_HL_LIB=OFF \
-            -DHDF5_BUILD_UTILS=OFF
-          cmake --build . -j 4
-          cmake --build --target install
+          brew install hdf5
       - name: download macos package
         uses: actions/download-artifact@v2
         with:
@@ -310,11 +300,15 @@ jobs:
           path: package
       - name: install macos package
         run: |
-          PACKAGE_NAME=$(find package -name *.dmg)
-          sudo hdiutil attach ${PACKAGE_NAME}
-          ls -l /Volumes/$(basename PACKAGE_NAME)
+          PACKAGE_NAME=$(find package -name *.xz)
+          tar -xvf ${PACKAGE_NAME} --strip-components=1
+          sudo cp -r usr /
       - name: run tests
         run: |
-          pip install pytest
+          mkdir -p ~/bin
+          ln -s /usr/local/bin/h5repack ~/bin/h5repack-shared
+          otool -L /usr/local/hdf5/lib/plugin/libh5jpegls.so
+          otool -l /usr/local/bin/h5repack
+          pip install pytest h5py
           pytest -rvP test.py
         working-directory: test
