@@ -19,17 +19,13 @@ endif()
 
 if (EXISTS "${CMAKE_BINARY_DIR}/conanbuildinfo.cmake")
     include(${CMAKE_BINARY_DIR}/conanbuildinfo.cmake)
-    conan_basic_setup(NO_OUTPUT_DIRS)
+    conan_basic_setup()
     list(PREPEND CMAKE_MODULE_PATH ${CMAKE_BINARY_DIR})
 endif()
 
 list(PREPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 include(h5jpegls_version)
 h5jpegls_configure_version_file(${CMAKE_CURRENT_SOURCE_DIR}/src/version.hpp.in ${CMAKE_CURRENT_SOURCE_DIR}/src/version.hpp)
-
-set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
 if (MSVC)
     add_compile_options(/W4 /permissive-)
