@@ -275,3 +275,43 @@ jobs:
         with:
           name: macos-${{ matrix.profile }}-${{ matrix.plugin }}-package
           path: package/*.dmg
+
+  macos-test:
+    needs: macos-build
+    runs-on: ubuntu-20.04
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v2
+        with:
+          lfs: true
+      - name: compile and install HDF5
+        run: |
+          wget https://github.com/HDFGroup/hdf5/archive/refs/tags/hdf5-1_12_1.tar.gz
+          tar -xf hdf5-1_12_1.tar.gz
+          cd hdf5-hdf5-1_12_1
+          mkdir build
+          cd build
+          cmake .. -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_STATIC_LIBS=OFF \
+            -DBUILD_TESTING=OFF \
+            -DHDF5_BUILD_EXAMPLES=OFF \
+            -DHDF5_BUILD_HL_LIB=OFF \
+            -DHDF5_BUILD_UTILS=OFF
+          cmake --build . -j 4
+          cmake --build --target install
+      - name: download macos package
+        uses: actions/download-artifact@v2
+        with:
+          name: macos-apple-clang12-module-package
+          path: package
+      - name: install macos package
+        run: |
+          PACKAGE_NAME=$(find package -name *.dmg)
+          sudo hdiutil attach ${PACKAGE_NAME}
+          ls -l /Volumes/$(basename PACKAGE_NAME)
+      - name: run tests
+        run: |
+          pip install pytest
+          pytest -rvP test.py
+        working-directory: test
+
