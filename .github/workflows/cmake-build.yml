@@ -74,12 +74,14 @@ jobs:
           fi
           ctest --extra-verbose --no-tests=error
       - name: build package
+        if: ${{ matrix.plugin == 'module' }}
         run: |
           cpack -G DEB -B $(pwd)/package --config build/CPackConfig.cmake
       - name: upload package
+        if: ${{ matrix.plugin == 'module' }}
         uses: actions/upload-artifact@v2
         with:
-          name: linux-${{ matrix.profile }}-${{ matrix.plugin }}-package
+          name: linux-${{ matrix.profile }}-package
           path: package/*.deb
   linux-test:
     needs: linux-build
@@ -95,14 +97,12 @@ jobs:
     - name: download linux package
       uses: actions/download-artifact@v2
       with:
-        name: linux-gcc10-module-package
+        name: linux-gcc10-package
         path: package
     - name: install linux package
       run: |
         PACKAGE_NAME=$(find package -name *.deb)
         dpkg -i ${PACKAGE_NAME}
-        SO_FILE=$(find /usr/local/hdf5 -name *.so)
-        ldd ${SO_FILE}
     - name: run tests
       run: |
         pip install pytest
@@ -157,6 +157,7 @@ jobs:
           .\activate_run.ps1
           ctest --extra-verbose --no-tests=error
       - name: build package
+        if: ${{ matrix.plugin == 'module' }}
         run: |
           CMAKE="$(which cmake)"
           CPACK="$(dirname "${CMAKE}")/cpack"
@@ -164,9 +165,10 @@ jobs:
           "${CPACK}" -G NSIS -B package --config build/CPackConfig.cmake
         shell: bash
       - name: upload package
+        if: ${{ matrix.plugin == 'module' }}
         uses: actions/upload-artifact@v2
         with:
-          name: windows-${{ matrix.profile }}-${{ matrix.plugin }}-package
+          name: windows-${{ matrix.profile }}-package
           path: package/*.exe
   windows-test:
     needs: windows-build
@@ -181,7 +183,7 @@ jobs:
         lfs: true
     - uses: actions/download-artifact@v2
       with:
-        name: windows-vs2019-module-package
+        name: windows-vs2019-package
         path: package
     - name: setup python 3
       uses: actions/setup-python@v2
@@ -220,9 +222,9 @@ jobs:
     strategy:
       matrix:
         plugin: [module, shared, static]
-        profile: [apple-clang12]
+        profile: [apple-clang13]
 
-    runs-on: macos-latest
+    runs-on: macos-11
     steps:
       - name: checkout repository
         uses: actions/checkout@v2
@@ -268,12 +270,14 @@ jobs:
           fi
           ctest --extra-verbose --no-tests=error
       - name: build package
+        if: ${{ matrix.plugin == 'module' }}
         run: |
           cpack -G DragNDrop -B $(pwd)/package --config build/CPackConfig.cmake
       - name: upload package
+        if: ${{ matrix.plugin == 'module' }}
         uses: actions/upload-artifact@v2
         with:
-          name: macos-${{ matrix.profile }}-${{ matrix.plugin }}-package
+          name: macos-${{ matrix.profile }}-package
           path: package/*.dmg
 
   macos-test:
@@ -302,7 +306,7 @@ jobs:
       - name: download macos package
         uses: actions/download-artifact@v2
         with:
-          name: macos-apple-clang12-module-package
+          name: macos-apple-clang13-package
           path: package
       - name: install macos package
         run: |
@@ -314,4 +318,3 @@ jobs:
           pip install pytest
           pytest -rvP test.py
         working-directory: test
-
