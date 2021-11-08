@@ -118,6 +118,10 @@ jobs:
     steps:
       - name: checkout repository
         uses: actions/checkout@v2
+      - name: setup python 3
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.9'
       - name: set environment variables
         run: |
           bash .github/workflows/set_env_vars.sh ${{ matrix.plugin }}
@@ -184,7 +188,7 @@ jobs:
     - uses: actions/download-artifact@v2
       with:
         name: windows-vs2019-package
-        path: package/h5jpegls-*
+        path: package
     - name: setup python 3
       uses: actions/setup-python@v2
       with:

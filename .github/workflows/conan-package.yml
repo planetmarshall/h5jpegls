@@ -79,6 +79,49 @@ jobs:
     steps:
       - name: checkout repository
         uses: actions/checkout@v2
+      - name: setup python 3
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.9'
+      - name: set environment variables
+        run: |
+          bash .github/workflows/set_env_vars_package.sh ${{ matrix.plugin }}
+      - name: create conan cache keys
+        run: |
+          python -m pip install --upgrade pip
+          pip install --upgrade conan
+          CONAN_ARGS="
+            --profile .github/workflows/conan/profiles/${{ matrix.profile }} \
+            --build missing"
+          conan lock create conanfile.py ${CONAN_ARGS} ${CONAN_OPTIONS}
+        shell: bash
+      - name: get conan cache
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.conan/data
+            !~/.conan/data/**/conan_sources.tgz
+          key: conan-${{ matrix.profile }}-${{ hashFiles('conan.lock') }}
+      - name: create conan package
+        run: |
+          conan create . \
+            --lockfile conan.lock \
+            --build missing \
+            --build h5jpegls
+        shell: bash
+  macos-build:
+    strategy:
+      matrix:
+        profile: [apple-clang13]
+        plugin: [static, shared]
+    runs-on: macos-11
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v2
+      - name: setup python 3
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.9'
       - name: set environment variables
         run: |
           bash .github/workflows/set_env_vars_package.sh ${{ matrix.plugin }}
