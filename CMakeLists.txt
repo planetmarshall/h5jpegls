@@ -19,17 +19,13 @@ endif()
 
 if (EXISTS "${CMAKE_BINARY_DIR}/conanbuildinfo.cmake")
     include(${CMAKE_BINARY_DIR}/conanbuildinfo.cmake)
-    conan_basic_setup(NO_OUTPUT_DIRS)
+    conan_basic_setup(KEEP_RPATHS)
     list(PREPEND CMAKE_MODULE_PATH ${CMAKE_BINARY_DIR})
 endif()
 
 list(PREPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 include(h5jpegls_version)
 h5jpegls_configure_version_file(${CMAKE_CURRENT_SOURCE_DIR}/src/version.hpp.in ${CMAKE_CURRENT_SOURCE_DIR}/src/version.hpp)
-
-set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
 if (MSVC)
     add_compile_options(/W4 /permissive-)
@@ -54,6 +50,7 @@ if (H5JPEGLS_ENABLE_TESTS)
 endif()
 
 set(CPACK_PACKAGE_VENDOR "Andrew Marshall")
+set(CPACK_PACKAGE_VERSION ${H5JPEGLS_VERSION})
 set(CPACK_PACKAGE_CONTACT "planetmarshalluk@gmail.com")
 set(CPACK_PACKAGE_DESCRIPTION "h5jpegls Compression Filter Plugin for HDF5")
 set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE.txt")

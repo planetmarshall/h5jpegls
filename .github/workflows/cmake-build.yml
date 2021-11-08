@@ -74,13 +74,15 @@ jobs:
           fi
           ctest --extra-verbose --no-tests=error
       - name: build package
+        if: ${{ matrix.plugin == 'module' }}
         run: |
-          cpack -G DEB -B $(pwd)/package --config build/CPackConfig.cmake
+          cpack -G "DEB;TXZ" -B $(pwd)/package --config build/CPackConfig.cmake
       - name: upload package
+        if: ${{ matrix.plugin == 'module' }}
         uses: actions/upload-artifact@v2
         with:
-          name: linux-${{ matrix.profile }}-${{ matrix.plugin }}-package
-          path: package/*.deb
+          name: linux-${{ matrix.profile }}-package
+          path: package/h5jpegls-*
   linux-test:
     needs: linux-build
     runs-on: ubuntu-20.04
@@ -95,14 +97,12 @@ jobs:
     - name: download linux package
       uses: actions/download-artifact@v2
       with:
-        name: linux-gcc10-module-package
+        name: linux-gcc10-package
         path: package
     - name: install linux package
       run: |
         PACKAGE_NAME=$(find package -name *.deb)
         dpkg -i ${PACKAGE_NAME}
-        SO_FILE=$(find /usr/local/hdf5 -name *.so)
-        ldd ${SO_FILE}
     - name: run tests
       run: |
         pip install pytest
@@ -118,6 +118,10 @@ jobs:
     steps:
       - name: checkout repository
         uses: actions/checkout@v2
+      - name: setup python 3
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.9'
       - name: set environment variables
         run: |
           bash .github/workflows/set_env_vars.sh ${{ matrix.plugin }}
@@ -157,17 +161,19 @@ jobs:
           .\activate_run.ps1
           ctest --extra-verbose --no-tests=error
       - name: build package
+        if: ${{ matrix.plugin == 'module' }}
         run: |
           CMAKE="$(which cmake)"
           CPACK="$(dirname "${CMAKE}")/cpack"
           echo "${CPACK}"
-          "${CPACK}" -G NSIS -B package --config build/CPackConfig.cmake
+          "${CPACK}" -G "NSIS;ZIP" -B package --config build/CPackConfig.cmake
         shell: bash
       - name: upload package
+        if: ${{ matrix.plugin == 'module' }}
         uses: actions/upload-artifact@v2
         with:
-          name: windows-${{ matrix.profile }}-${{ matrix.plugin }}-package
-          path: package/*.exe
+          name: windows-${{ matrix.profile }}-package
+          path: package/h5jpegls-*
   windows-test:
     needs: windows-build
     runs-on: windows-2019
@@ -181,7 +187,7 @@ jobs:
         lfs: true
     - uses: actions/download-artifact@v2
       with:
-        name: windows-vs2019-module-package
+        name: windows-vs2019-package
         path: package
     - name: setup python 3
       uses: actions/setup-python@v2
@@ -215,3 +221,98 @@ jobs:
         pip install pytest h5py
         pytest -vrP test.py
       working-directory: test
+
+  macos-build:
+    strategy:
+      matrix:
+        plugin: [module, shared, static]
+        profile: [apple-clang13]
+
+    runs-on: macos-11
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v2
+      - name: set environment variables
+        run: |
+          bash .github/workflows/set_env_vars.sh ${{ matrix.plugin }}
+      - name: setup python 3
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.9'
+      - name: create conan cache keys
+        run: |
+          python -m pip install --upgrade pip
+          pip install --upgrade conan
+          conan config install .github/workflows/conan
+          CONAN_ARGS="
+            --profile ${{ matrix.profile }} \
+            --build missing
+          "
+          conan lock create conanfile.py ${CONAN_ARGS} ${CONAN_OPTIONS}
+      - name: get conan cache
+        uses: actions/cache@v2
+        id: cache
+        with:
+          path: |
+            ~/.conan/data
+            !~/.conan/data/**/conan_sources.tgz
+          key: conan-${{ matrix.profile }}-${{ hashFiles('conan.lock') }}
+      - name: install conan dependencies
+        run: |
+          conan install . \
+            --install-folder build \
+            --lockfile conan.lock \
+            --build missing
+      - name: build with cmake
+        run: |
+          conan build . --build-folder build
+      - name: run tests
+        run: |
+          cd build
+          if [ "${{ matrix.plugin }}" = "module" ]; then
+            export HDF5_PLUGIN_PATH=$(pwd)/plugins
+          fi
+          ctest --extra-verbose --no-tests=error
+      - name: build package
+        if: ${{ matrix.plugin == 'module' }}
+        run: |
+          cpack -G TXZ -B $(pwd)/package --config build/CPackConfig.cmake
+      - name: upload package
+        if: ${{ matrix.plugin == 'module' }}
+        uses: actions/upload-artifact@v2
+        with:
+          name: macos-${{ matrix.profile }}-package
+          path: package/h5jpegls-*
+
+  macos-test:
+    needs: macos-build
+    runs-on: macos-11
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v2
+        with:
+          lfs: true
+      - name: setup python 3
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.9'
+      - name: install HDF5
+        run: |
+          brew install hdf5
+      - name: download macos package
+        uses: actions/download-artifact@v2
+        with:
+          name: macos-apple-clang13-package
+          path: package
+      - name: install macos package
+        run: |
+          PACKAGE_NAME=$(find package -name *.xz)
+          tar -xvf ${PACKAGE_NAME} --strip-components=1
+          sudo cp -r usr /
+      - name: run tests
+        run: |
+          mkdir -p ~/bin
+          ln -s /usr/local/bin/h5repack ~/bin/h5repack-shared
+          pip install pytest h5py
+          pytest -rvP test.py
+        working-directory: test
