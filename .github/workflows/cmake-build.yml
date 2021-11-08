@@ -1,6 +1,8 @@
 name: cmake-build
 on:
   push:
+    branches:
+      - main
   pull_request:
     branches:
       - main
@@ -74,13 +76,13 @@ jobs:
       - name: build package
         if: ${{ matrix.plugin == 'module' }}
         run: |
-          cpack -G DEB -B $(pwd)/package --config build/CPackConfig.cmake
+          cpack -G "DEB;TXZ" -B $(pwd)/package --config build/CPackConfig.cmake
       - name: upload package
         if: ${{ matrix.plugin == 'module' }}
         uses: actions/upload-artifact@v2
         with:
           name: linux-${{ matrix.profile }}-package
-          path: package/*.deb
+          path: package/h5jpegls-*
   linux-test:
     needs: linux-build
     runs-on: ubuntu-20.04
@@ -160,14 +162,14 @@ jobs:
           CMAKE="$(which cmake)"
           CPACK="$(dirname "${CMAKE}")/cpack"
           echo "${CPACK}"
-          "${CPACK}" -G NSIS -B package --config build/CPackConfig.cmake
+          "${CPACK}" -G "NSIS;ZIP" -B package --config build/CPackConfig.cmake
         shell: bash
       - name: upload package
         if: ${{ matrix.plugin == 'module' }}
         uses: actions/upload-artifact@v2
         with:
           name: windows-${{ matrix.profile }}-package
-          path: package/*.exe
+          path: package/h5jpegls-*
   windows-test:
     needs: windows-build
     runs-on: windows-2019
@@ -182,7 +184,7 @@ jobs:
     - uses: actions/download-artifact@v2
       with:
         name: windows-vs2019-package
-        path: package
+        path: package/h5jpegls-*
     - name: setup python 3
       uses: actions/setup-python@v2
       with:
@@ -276,7 +278,7 @@ jobs:
         uses: actions/upload-artifact@v2
         with:
           name: macos-${{ matrix.profile }}-package
-          path: package/*.xz
+          path: package/h5jpegls-*
 
   macos-test:
     needs: macos-build
@@ -307,8 +309,6 @@ jobs:
         run: |
           mkdir -p ~/bin
           ln -s /usr/local/bin/h5repack ~/bin/h5repack-shared
-          otool -L /usr/local/hdf5/lib/plugin/libh5jpegls.so
-          otool -l /usr/local/bin/h5repack
           pip install pytest h5py
           pytest -rvP test.py
         working-directory: test
