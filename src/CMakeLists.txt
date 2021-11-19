@@ -22,13 +22,13 @@ else()
     set(H5JPEGLS_PLUGIN_DESTINATION hdf5/lib/plugin)
 endif()
 
-target_compile_features(h5jpegls PRIVATE cxx_std_20)
+target_compile_features(h5jpegls PRIVATE cxx_std_17)
 target_link_libraries(
         h5jpegls
    PRIVATE
         charls::charls
         hdf5::hdf5
-        Threads::Threads
+        TBB::tbb
 )
 
 install(

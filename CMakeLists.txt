@@ -44,9 +44,9 @@ else()
     endif()
 endif()
 
-find_package(Threads REQUIRED)
 find_package(charls REQUIRED)
 find_package(HDF5 REQUIRED COMPONENTS C)
+find_package(TBB REQUIRED)
 add_subdirectory(src)
 
 if (H5JPEGLS_BUILD_TESTS)

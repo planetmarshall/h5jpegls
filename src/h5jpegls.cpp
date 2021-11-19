@@ -7,6 +7,7 @@
 #include <hdf5.h>
 #pragma warning( pop )
 #include <charls/charls.h>
+#include <tbb/tbb.h>
 
 #include <array>
 #include <vector>
@@ -17,7 +18,11 @@
 namespace {
 struct LegacyCodecParameters {
     static LegacyCodecParameters from_array(const unsigned int params[]) {
-        return {.width = params[0], .height = params[1], .bytes_per_pixel = params[2]};
+        return {
+            .width = params[0],
+            .height = params[1],
+            .bytes_per_pixel = params[2]
+        };
     }
 
     unsigned int width{};
@@ -27,22 +32,36 @@ struct LegacyCodecParameters {
 
 struct CodecParameters {
     static CodecParameters from_array(const unsigned int params[]) {
-        return { .chunk_m = params[0], .chunk_n = params[1], .bits_per_element = params[2], .num_components = params[3] };
+        return {
+            .chunk_m = params[0],
+            .chunk_n = params[1],
+            .bits_per_element = params[2],
+            .num_components = params[3],
+            .blocks_m = params[4],
+            .blocks_n = params[5]
+        };
     }
 
     unsigned int chunk_m{};
     unsigned int chunk_n{};
     unsigned int bits_per_element{};
     unsigned int num_components = 1;
+    unsigned int blocks_m = 1;
+    unsigned int blocks_n = 1;
 
-    [[nodiscard]] std::array<unsigned int, 4> elements() const {
+    [[nodiscard]] std::array<unsigned int, 6> elements() const {
         return {
-            chunk_m, chunk_n, bits_per_element, num_components
+            chunk_m, chunk_n, bits_per_element, num_components, blocks_m, blocks_n
         };
     }
 };
 
-size_t decode(void **buffer, size_t *buffer_size, size_t data_size, const CodecParameters &) {
+size_t decode_blocks() {
+
+}
+
+size_t decode(void **buffer, size_t *buffer_size, size_t data_size, const CodecParameters &params) {
+
     charls::jpegls_decoder decoder;
     decoder.source(*buffer, data_size);
     decoder.read_header();
@@ -84,7 +103,71 @@ size_t decode_legacy(void **buffer, size_t *buffer_size, const LegacyCodecParame
     return required_bytes;
 }
 
+std::vector<uint8_t> get_tile_for_encoding(
+    const uint8_t * buffer,
+    const int current_row,
+    const int current_col,
+    const int total_cols,
+    const charls::frame_info & frame) {
+    auto bytes_per_sample = frame.bits_per_sample / 8;
+    auto src_stride = total_cols * frame.component_count * bytes_per_sample;
+    auto col_stride = frame.component_count * bytes_per_sample;
+    auto src_offset = current_row * src_stride + current_col * col_stride;
+
+    auto dest_stride = frame.width * frame.component_count * bytes_per_sample;
+    std::vector<uint8_t> tile(frame.height * dest_stride);
+
+    for (int j = 0; j < frame.height; ++j) {
+        auto dest_row_offset = j * dest_stride;
+        auto src_row_offset = src_offset + j * src_stride;
+        memcpy(tile.data() + dest_row_offset, buffer + src_row_offset, dest_stride);
+    }
+
+    return tile;
+}
+
+size_t encode_tiles(void *buffer, const CodecParameters & params) {
+    auto row_grain = params.chunk_m / params.blocks_m;
+    auto col_grain = params.chunk_n / params.blocks_n;
+    auto blocked_range = tbb::blocked_range2d<uint32_t , uint32_t>(
+        0, params.chunk_m, row_grain,
+        0, params.chunk_n, col_grain
+    );
+    tbb::parallel_for(blocked_range, [&] ( const auto & range) {
+      int tile_index
+      uint32_t width = range.cols().end() - range.cols().begin();
+      uint32_t height = range.rows().end() - range.rows().begin();
+      charls::jpegls_encoder encoder{};
+      charls::frame_info frame {
+          .width = width,
+          .height = height,
+          .bits_per_sample = static_cast<int32_t>(params.bits_per_element),
+          .component_count = static_cast<int32_t>(params.num_components),
+        };
+      encoder.frame_info(frame);
+      if (frame.component_count > 1) {
+          encoder.interleave_mode(charls::interleave_mode::Sample);
+      }
+      std::vector<uint8_t> encoding_buffer(encoder.estimated_destination_size());
+      encoder.destination(encoding_buffer);
+      auto src_buffer = get_tile_for_encoding(
+          static_cast<uint8_t *>(buffer),
+          range.rows().begin(),
+          range.cols().begin(),
+          params.chunk_n,
+          frame);
+
+      auto num_encoded_bytes = encoder.encode(src_buffer);
+    });
+
+    return 0;
+}
+
 size_t encode(void **buffer, size_t *buffer_size, size_t data_size, const CodecParameters &parameters) {
+    if (parameters.blocks_m != 1 || parameters.blocks_n != 1) {
+        return encode_tiles(*buffer, parameters);
+    }
+
     charls::jpegls_encoder encoder;
     charls::frame_info frame{
         .width = parameters.chunk_n,
@@ -136,7 +219,7 @@ size_t codec_filter(unsigned int flags, size_t num_parameters, const unsigned in
 
     try {
         if (flags & H5Z_FLAG_REVERSE) {
-            if (num_parameters == 4) {
+            if (num_parameters > 3) {
                 return decode(buf, buf_size, nbytes, CodecParameters::from_array(parameters));
             }
             return decode_legacy(buf, buf_size, LegacyCodecParameters::from_array(parameters));
@@ -177,9 +260,7 @@ herr_t h5jpegls_set_local(hid_t dcpl_id, hid_t type_id, hid_t) {
         parameters.num_components = static_cast<unsigned int>(chunk_dimensions[2]);
     }
 
-    if (num_user_parameters > 0) {
-        parameters.bits_per_element = user_parameters[0];
-    } else {
+    if (num_user_parameters == 0 || user_parameters[0] == 0) {
         H5T_class_t type_class = H5Tget_class(type_id);
         auto bytes_per_element = static_cast<unsigned int>(H5Tget_size(type_id));
         if (type_class == H5T_ARRAY || type_class == H5T_ENUM) {
@@ -191,9 +272,15 @@ herr_t h5jpegls_set_local(hid_t dcpl_id, hid_t type_id, hid_t) {
             return -1;
         }
         parameters.bits_per_element = bytes_per_element * 8;
+    } else {
+        parameters.bits_per_element = user_parameters[0];
+    }
+    if (num_user_parameters == 3) {
+        parameters.blocks_m = std::min(user_parameters[1], parameters.chunk_m);
+        parameters.blocks_n = std::min(user_parameters[2], parameters.chunk_n);
     }
 
-    auto cd_values = parameters.elements();
+auto cd_values = parameters.elements();
     status = H5Pmodify_filter(dcpl_id, h5jpegls::filter_id, flags, cd_values.size(), cd_values.data());
 
     if (status < 0) {

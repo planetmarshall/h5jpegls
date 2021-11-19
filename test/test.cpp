@@ -115,7 +115,7 @@ void cleanup(hid_t &file_id, hid_t &space_id, hid_t &dset_id, hid_t &dcpl_id) {
     }
 }
 
-TEMPLATE_TEST_CASE("Scenario: the filter can only be applied to compatible integer valued datasets", "[plugin][template]", float, double, int32_t, uint64_t) {
+TEMPLATE_TEST_CASE("Scenario: the filter can only be applied to compatible integer valued datasets", "[template]", float, double, int32_t, uint64_t) {
     register_plugin();
     auto file_name = temp_file().string();
     hid_t file_id = -1;
@@ -148,7 +148,7 @@ TEMPLATE_TEST_CASE("Scenario: the filter can only be applied to compatible integ
     cleanup(file_id, space_id, dset_id, dcpl_id);
 }
 
-SCENARIO("The filter can only be applied to 2D or 3D datasets", "[plugin]") {
+SCENARIO("The filter can only be applied to 2D or 3D datasets") {
     register_plugin();
     auto file_name = temp_file().string();
     hid_t file_id = -1;
@@ -248,7 +248,7 @@ void roundtrip_test(
     }
 }
 
-TEMPLATE_TEST_CASE("Scenario: valid data can written to an HDF5 file, compressed, decompressed and read back", "[plugin][template]", uint8_t, int8_t, uint16_t, int16_t) {
+TEMPLATE_TEST_CASE("Scenario: valid data can written to an HDF5 file, compressed, decompressed and read back", "[template]", uint8_t, int8_t, uint16_t, int16_t) {
     GIVEN("A small 2D array of integers in a single chunk") {
         constexpr hsize_t rows = 3;
         constexpr hsize_t cols = 4;
