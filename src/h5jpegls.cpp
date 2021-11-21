@@ -134,7 +134,6 @@ size_t encode_tiles(void *buffer, const CodecParameters & params) {
         0, params.chunk_n, col_grain
     );
     tbb::parallel_for(blocked_range, [&] ( const auto & range) {
-      int tile_index
       uint32_t width = range.cols().end() - range.cols().begin();
       uint32_t height = range.rows().end() - range.rows().begin();
       charls::jpegls_encoder encoder{};

@@ -41,6 +41,7 @@ class H5jpeglsConan(ConanFile):
     def requirements(self):
         self.requires("hdf5/1.12.0")
         self.requires("charls/2.1.0")
+        self.requires("tbb/2020.3")
 
     def build_requirements(self):
         if self.options.with_tests:

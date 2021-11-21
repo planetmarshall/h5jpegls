@@ -1,11 +1,11 @@
-add_executable(h5jpegls_test test.cpp)
+add_executable(h5jpegls_test test_tile.cpp test_plugin.cpp)
 if (H5JPEGLS_BUILD_LIBRARY)
 	target_link_libraries(h5jpegls_test PRIVATE h5jpegls)
 	add_compile_definitions(h5jpegls_test PRIVATE H5JPEGLS_BUILD_LIBRARY)
 else()
 	add_dependencies(h5jpegls_test h5jpegls)
 endif()
-
+target_include_directories(h5jpegls_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}../src)
 target_link_libraries(h5jpegls_test
     PRIVATE
         hdf5::hdf5

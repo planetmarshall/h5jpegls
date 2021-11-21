@@ -1,6 +1,15 @@
-set(H5JPEGLS_SOURCES h5jpegls.cpp version.hpp ${CMAKE_SOURCE_DIR}/include/h5jpegls/h5jpegls.h)
+set(H5JPEGLS_HEADERS
+        ${CMAKE_SOURCE_DIR}/include/h5jpegls/h5jpegls.h
+)
+set(H5JPEGLS_SOURCES
+        h5jpegls.cpp
+        tile.cpp
+        tile.hpp
+        version.hpp
+)
+
 if (H5JPEGLS_BUILD_LIBRARY)
-    add_library(h5jpegls h5jpegls.cpp ${H5JPEGLS_SOURCES})
+    add_library(h5jpegls ${H5JPEGLS_SOURCES} ${H5JPEGLS_HEADERS})
     set_target_properties(h5jpegls PROPERTIES PUBLIC_HEADER ${CMAKE_SOURCE_DIR}/include/h5jpegls/h5jpegls.h)
     target_include_directories(h5jpegls PUBLIC
             $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include>
@@ -9,7 +18,7 @@ if (H5JPEGLS_BUILD_LIBRARY)
     set(H5JPEGLS_PLUGIN_DESTINATION lib)
     set_target_properties(h5jpegls PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON)
 else()
-    add_library(h5jpegls MODULE ${H5JPEGLS_SOURCES})
+    add_library(h5jpegls MODULE ${H5JPEGLS_SOURCES} ${H5JPEGLS_HEADERS})
     target_include_directories(h5jpegls PRIVATE ${CMAKE_SOURCE_DIR}/include)
     set_target_properties(h5jpegls
             PROPERTIES
