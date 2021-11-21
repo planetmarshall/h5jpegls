@@ -3,7 +3,7 @@
 #include <charls/charls.h>
 #include <catch2/catch.hpp>
 
-TEMPLATE_TEST_CASE("Senario: a tile can be copied from the source buffer", "[template][tile]", uint8_t, int8_t, uint16_t, int16_t) {
+TEMPLATE_TEST_CASE("Scenario: a tile can be copied from the source buffer", "[template][tile]", uint8_t, int8_t, uint16_t, int16_t) {
     std::vector<TestType> image{
         0, 1, 2, 3, 4, 5, 6, 7,
         10, 11, 12, 13, 14, 15, 16, 17,
@@ -31,4 +31,44 @@ TEMPLATE_TEST_CASE("Senario: a tile can be copied from the source buffer", "[tem
     memcpy(tile_data.data(), tile.data.data(), tile_data.size() * sizeof(TestType));
 
     REQUIRE(expected_tile_data == tile_data);
+}
+
+TEMPLATE_TEST_CASE("Scenario: a tile can be copied to the destination buffer", "[template][tile]", uint8_t, int8_t, uint16_t, int16_t) {
+    std::vector<TestType> image{
+        0, 1, 2, 3, 4, 5, 6, 7,
+        10, 11, 0, 0, 0, 0, 16, 17,
+        20, 21, 0, 0, 0, 0, 26, 27,
+        30, 31, 0, 0, 0, 0, 36, 37,
+        40, 41, 42, 43, 44, 45, 46, 47,
+        50, 51, 52, 53, 54, 55, 56, 57
+    };
+
+    h5jpegls::Tile tile{};
+    tile.row = 1;
+    tile.col = 2;
+    constexpr int cols = 8;
+    charls::frame_info frame;
+    frame.width = 4;
+    frame.height = 3;
+    frame.bits_per_sample = sizeof(TestType) * 8;
+    frame.component_count = 1;
+    std::vector<TestType> decoded_tile_data{
+        12, 13, 14, 15,
+        22, 23, 24, 25,
+        32, 33, 34, 35
+    };
+    std::vector<TestType> expected_image{
+        0, 1, 2, 3, 4, 5, 6, 7,
+        10, 11, 12, 13, 14, 15, 16, 17,
+        20, 21, 22, 23, 24, 25, 26, 27,
+        30, 31, 32, 33, 34, 35, 36, 37,
+        40, 41, 42, 43, 44, 45, 46, 47,
+        50, 51, 52, 53, 54, 55, 56, 57
+    };
+    tile.data.resize(decoded_tile_data.size() * sizeof(TestType));
+    memcpy(tile.data.data(), decoded_tile_data.data(), decoded_tile_data.size() * sizeof(TestType));
+
+    h5jpegls::copy_tile_to_buffer(tile, cols, image.data());
+
+    REQUIRE(expected_image == image);
 }

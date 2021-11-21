@@ -25,3 +25,7 @@ h5jpegls::Tile h5jpegls::copy_tile_from_buffer(
 
     return tile;
 }
+
+void h5jpegls::copy_tile_to_buffer(const Tile & tile, int buffer_cols, void * buffer) {
+
+}

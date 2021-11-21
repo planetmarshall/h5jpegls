@@ -15,6 +15,7 @@ namespace h5jpegls {
     };
 
     Tile copy_tile_from_buffer(const void * buffer, int buffer_cols, uint16_t row, uint16_t col, const charls::frame_info & frame);
+    void copy_tile_to_buffer(const Tile & tile, int buffer_cols, void * buffer);
 }
 
 #endif // H5JPEGLS_TILE_HPP
