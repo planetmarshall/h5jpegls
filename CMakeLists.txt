@@ -61,6 +61,7 @@ if (WIN32)
     # See https://gitlab.kitware.com/cmake/cmake/-/issues/22441
     string(REPLACE "/" "\\\\" ALL_USERS_PROFILE "${ALL_USERS_PROFILE}")
     set(CPACK_NSIS_INSTALL_ROOT "${ALL_USERS_PROFILE}")
+    set(CPACK_NSIS_PACKAGE_NAME ${PROJECT_NAME})
 elseif(NOT CPACK_PACKAGING_INSTALL_PREFIX)
     set(CPACK_PACKAGING_INSTALL_PREFIX "/usr/local")
 endif()
