@@ -115,7 +115,7 @@ htri_t can_apply_filter(hid_t dcpl_id, hid_t type_id, hid_t) {
         return 0;
     }
     auto type_class = H5Tget_class(type_id);
-    bool can_filter = type_class == H5T_INTEGER;
+    bool can_filter = type_class == H5T_INTEGER || type_class == H5T_ENUM;
     if (type_class == H5T_ARRAY) {
         auto base_class = H5Tget_super(type_id);
         can_filter = base_class == H5T_INTEGER;
@@ -181,7 +181,7 @@ herr_t h5jpegls_set_local(hid_t dcpl_id, hid_t type_id, hid_t) {
     } else {
         H5T_class_t type_class = H5Tget_class(type_id);
         auto bytes_per_element = static_cast<unsigned int>(H5Tget_size(type_id));
-        if (type_class == H5T_ARRAY) {
+        if (type_class == H5T_ARRAY || type_class == H5T_ENUM) {
             hid_t super_type = H5Tget_super(type_id);
             bytes_per_element = static_cast<unsigned int>(H5Tget_size(super_type));
             H5Tclose(super_type);
