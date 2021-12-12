@@ -1,5 +1,5 @@
 #define CATCH_CONFIG_MAIN
-#ifdef H5JPEGLS_STATIC_PLUGIN
+#ifdef H5JPEGLS_BUILD_LIBRARY
 #include <h5jpegls/h5jpegls.h>
 #endif
 
@@ -62,7 +62,7 @@ namespace {
     }
 
 void register_plugin() {
-#ifdef H5JPEGLS_STATIC_PLUGIN
+#ifdef H5JPEGLS_BUILD_LIBRARY
     h5jpegls_register_plugin();
 #endif
     }
@@ -216,13 +216,10 @@ void roundtrip_test(
         status = H5Dwrite(dset_id, hdf5_type_traits<TestType>::type(), H5S_ALL, H5S_ALL, H5P_DEFAULT, data.data());
         REQUIRE(status >= 0);
         double uncompressed_size = static_cast<double>(data.size()) * sizeof(TestType);
-        THEN("The storage size of the dataset is less than that of the array") {
-            auto storage_size = static_cast<double>(H5Dget_storage_size(dset_id));
-            REQUIRE(storage_size > 0);
-            auto compression_ratio = uncompressed_size / storage_size;
-            std::cout << "Compression ratio: " << compression_ratio << "\n";
-            REQUIRE(compression_ratio > 1);
-        }
+        auto storage_size = static_cast<double>(H5Dget_storage_size(dset_id));
+        REQUIRE(storage_size > 0);
+        auto compression_ratio = uncompressed_size / storage_size;
+        std::cout << "Compression ratio: " << compression_ratio << "\n";
         cleanup(file_id, space_id, dset_id, dcpl_id);
         status = H5close();
         REQUIRE(status >= 0);
@@ -252,6 +249,14 @@ void roundtrip_test(
 }
 
 TEMPLATE_TEST_CASE("Scenario: valid data can written to an HDF5 file, compressed, decompressed and read back", "[plugin][template]", uint8_t, int8_t, uint16_t, int16_t) {
+    GIVEN("A small 2D array of integers in a single chunk") {
+        constexpr hsize_t rows = 3;
+        constexpr hsize_t cols = 4;
+        auto data = test_data<TestType>(rows, cols, 1);
+        std::array<hsize_t, 2> dimensions{rows, cols};
+        std::array<unsigned int, 0> params{};
+        roundtrip_test<TestType>(dimensions, dimensions, params);
+    }
     GIVEN("A 2D array of integers in a single chunk") {
         constexpr hsize_t rows = 943;
         constexpr hsize_t cols = 721;
@@ -266,20 +271,6 @@ TEMPLATE_TEST_CASE("Scenario: valid data can written to an HDF5 file, compressed
         constexpr hsize_t channels = 3;
         auto data = test_data<TestType>(rows, cols, channels);
         std::array<hsize_t, 3> dimensions{rows, cols, channels};
-        std::array<unsigned int, 0> params{};
-        roundtrip_test<TestType>(dimensions, dimensions, params);
-    }
-}
-
-TEMPLATE_TEST_CASE("Scenario: valid data can written with multiple threads to an HDF5 file, compressed, decompressed and read back", "[plugin][template]", uint8_t, int8_t, uint16_t, int16_t) {
-    constexpr hsize_t blocks_m = 3;
-    constexpr hsize_t blocks_n = 4;
-    std::array<unsigned int, 3> params{0, blocks_m, blocks_n};
-    GIVEN("A 2D array of integers in a single chunk") {
-        constexpr hsize_t rows = 943;
-        constexpr hsize_t cols = 721;
-        auto data = test_data<TestType>(rows, cols, 1);
-        std::array<hsize_t, 2> dimensions{rows, cols};
         std::array<unsigned int, 0> params{};
         roundtrip_test<TestType>(dimensions, dimensions, params);
     }
