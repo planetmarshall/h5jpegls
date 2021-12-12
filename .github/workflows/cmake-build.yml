@@ -12,21 +12,21 @@ jobs:
   linux-build:
     strategy:
       matrix:
-        image: ['conanio/gcc10-ubuntu16.04:1.40.3', 'conanio/clang12-ubuntu16.04:1.40.3']
+        image: ['conanio/gcc11-ubuntu16.04', 'conanio/clang13-ubuntu16.04']
         libcxx: [libstdc++11, libc++]
         plugin: [module, shared, static]
         exclude:
-          - image: 'conanio/gcc10-ubuntu16.04:1.40.3'
+          - image: 'conanio/gcc11-ubuntu16.04'
             libcxx: libc++
         include:
-          - image: 'conanio/gcc10-ubuntu16.04:1.40.3'
-            profile: gcc10
-          - image: 'conanio/clang12-ubuntu16.04:1.40.3'
+          - image: 'conanio/gcc11-ubuntu16.04'
+            profile: gcc11
+          - image: 'conanio/clang13-ubuntu16.04'
             libcxx: libc++
-            profile: clang12-libc++
-          - image: 'conanio/clang12-ubuntu16.04:1.40.3'
+            profile: clang13-libc++
+          - image: 'conanio/clang13-ubuntu16.04'
             libcxx: libstdc++11
-            profile: clang12-libstdc++
+            profile: clang13-libstdc++
 
     runs-on: ubuntu-20.04
     container:
@@ -97,7 +97,7 @@ jobs:
     - name: download linux package
       uses: actions/download-artifact@v2
       with:
-        name: linux-gcc10-package
+        name: linux-gcc11-package
         path: package
     - name: install linux package
       run: |
@@ -106,7 +106,7 @@ jobs:
     - name: run tests
       run: |
         pip install pytest
-        pytest -rvP test.py
+        pytest --log-cli-level=INFO -rvP test.py
       working-directory: test
 
   windows-build:
@@ -219,7 +219,7 @@ jobs:
     - name: run tests
       run: |
         pip install pytest h5py
-        pytest -vrP test.py
+        pytest --log-cli-level=INFO -vrP test.py
       working-directory: test
 
   macos-build:
@@ -314,5 +314,5 @@ jobs:
           mkdir -p ~/bin
           ln -s /usr/local/bin/h5repack ~/bin/h5repack-shared
           pip install pytest h5py
-          pytest -rvP test.py
+          pytest --log-cli-level=INFO -rvP test.py
         working-directory: test

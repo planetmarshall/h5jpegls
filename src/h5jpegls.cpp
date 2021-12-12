@@ -98,11 +98,14 @@ size_t encode(void **buffer, size_t *buffer_size, size_t data_size, const CodecP
     if (frame.component_count > 1) {
         encoder.interleave_mode(charls::interleave_mode::Sample);
     }
+    auto destination_size = encoder.estimated_destination_size();
+    if (*buffer_size < destination_size) {
+        *buffer = std::realloc(*buffer, destination_size);
+        *buffer_size = destination_size;
+    }
     std::vector<uint8_t> encoding_buffer(*buffer_size);
     encoder.destination(encoding_buffer);
     auto num_encoded_bytes = encoder.encode(*buffer, data_size);
-    assert(num_encoded_bytes < *buffer_size);
-    *buffer_size = num_encoded_bytes;
     memcpy(*buffer, encoding_buffer.data(), num_encoded_bytes);
     return num_encoded_bytes;
 }
@@ -110,7 +113,7 @@ size_t encode(void **buffer, size_t *buffer_size, size_t data_size, const CodecP
 htri_t can_apply_filter(hid_t dcpl_id, hid_t type_id, hid_t) {
     constexpr hsize_t max_rank = 32;
     std::array<hsize_t, max_rank> chunk_dimensions{};
-    auto rank = H5Pget_chunk(dcpl_id, 32, chunk_dimensions.data());
+    auto rank = H5Pget_chunk(dcpl_id, max_rank, chunk_dimensions.data());
     if (rank != 2 && rank != 3) {
         return 0;
     }

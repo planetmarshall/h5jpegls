@@ -1,5 +1,5 @@
 #define CATCH_CONFIG_MAIN
-#ifdef H5JPEGLS_STATIC_PLUGIN
+#ifdef H5JPEGLS_BUILD_LIBRARY
 #include <h5jpegls/h5jpegls.h>
 #endif
 
@@ -62,7 +62,7 @@ namespace {
     }
 
 void register_plugin() {
-#ifdef H5JPEGLS_STATIC_PLUGIN
+#ifdef H5JPEGLS_BUILD_LIBRARY
     h5jpegls_register_plugin();
 #endif
     }
@@ -181,7 +181,12 @@ SCENARIO("The filter can only be applied to 2D or 3D datasets", "[plugin]") {
     cleanup(file_id, space_id, dset_id, dcpl_id);
 }
 
-TEMPLATE_TEST_CASE("Scenario: valid data can written to an HDF5 file, compressed, decompressed and read back", "[plugin][template]", uint8_t, int8_t, uint16_t, int16_t) {
+template<typename TestType, size_t Rank, size_t NumParams>
+void roundtrip_test(
+    const std::array<hsize_t, Rank> & dimensions,
+    const std::array<hsize_t, Rank> & chunk,
+    const std::array<unsigned int, NumParams> & parameters
+    ) {
     // Adapted from https://github.com/HDFGroup/hdf5_plugins/blob/master/BZIP2/example/h5ex_d_bzip2.c
     register_plugin();
     hid_t file_id = -1;
@@ -193,115 +198,80 @@ TEMPLATE_TEST_CASE("Scenario: valid data can written to an HDF5 file, compressed
     auto file_name = temp_file().string();
     file_id = H5Fcreate(file_name.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
     REQUIRE(file_id >=0);
-    GIVEN("A 2D array of integers") {
-        constexpr hsize_t rows = 943;
-        constexpr hsize_t cols = 721;
-        auto data = test_data<TestType>(rows, cols, 1);
-        std::array<hsize_t, 2> dimensions{rows, cols};
-        space_id = H5Screate_simple(static_cast<int>(dimensions.size()), dimensions.data(), NULL);
-        REQUIRE(space_id >= 0);
-        WHEN("The array is written to a dataset in a single chunk") {
-            dcpl_id = H5Pcreate(H5P_DATASET_CREATE);
-            REQUIRE(dcpl_id >= 0);
-            status = H5Pset_filter(dcpl_id, jpegls_filter_id, H5Z_FLAG_MANDATORY, 0, NULL);
-            REQUIRE(status >= 0);
-            std::array<hsize_t, 2> chunk{rows, cols};
-            status = H5Pset_chunk(dcpl_id, static_cast<int>(chunk.size()), chunk.data());
-            REQUIRE(status >= 0);
-            dset_id = H5Dcreate(file_id, dataset_name, hdf5_type_traits<TestType>::type(), space_id, H5P_DEFAULT, dcpl_id, H5P_DEFAULT);
+    auto rows = dimensions[0];
+    auto cols = dimensions[1];
+    auto channels = Rank == 3 ? dimensions[2] : 1;
+    auto data = test_data<TestType>(rows, cols, channels);
+    space_id = H5Screate_simple(static_cast<int>(dimensions.size()), dimensions.data(), NULL);
+    REQUIRE(space_id >= 0);
+    WHEN("The array is written to a dataset in a single chunk") {
+        dcpl_id = H5Pcreate(H5P_DATASET_CREATE);
+        REQUIRE(dcpl_id >= 0);
+        status = H5Pset_filter(dcpl_id, jpegls_filter_id, H5Z_FLAG_MANDATORY, parameters.size(), parameters.data());
+        REQUIRE(status >= 0);
+        status = H5Pset_chunk(dcpl_id, static_cast<int>(chunk.size()), chunk.data());
+        REQUIRE(status >= 0);
+        dset_id = H5Dcreate(file_id, dataset_name, hdf5_type_traits<TestType>::type(), space_id, H5P_DEFAULT, dcpl_id, H5P_DEFAULT);
+        REQUIRE(dset_id >= 0);
+        status = H5Dwrite(dset_id, hdf5_type_traits<TestType>::type(), H5S_ALL, H5S_ALL, H5P_DEFAULT, data.data());
+        REQUIRE(status >= 0);
+        double uncompressed_size = static_cast<double>(data.size()) * sizeof(TestType);
+        auto storage_size = static_cast<double>(H5Dget_storage_size(dset_id));
+        REQUIRE(storage_size > 0);
+        auto compression_ratio = uncompressed_size / storage_size;
+        std::cout << "Compression ratio: " << compression_ratio << "\n";
+        cleanup(file_id, space_id, dset_id, dcpl_id);
+        status = H5close();
+        REQUIRE(status >= 0);
+
+        register_plugin();
+        AND_WHEN("The dataset is read back") {
+            file_id = H5Fopen(file_name.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
+            REQUIRE(file_id >= 0);
+            dset_id = H5Dopen(file_id, dataset_name, H5P_DEFAULT);
             REQUIRE(dset_id >= 0);
-            status = H5Dwrite(dset_id, hdf5_type_traits<TestType>::type(), H5S_ALL, H5S_ALL, H5P_DEFAULT, data.data());
-            REQUIRE(status >= 0);
-            double uncompressed_size = static_cast<double>(data.size()) * sizeof(TestType);
-            THEN("The storage size of the dataset is less than that of the array") {
-                auto storage_size = static_cast<double>(H5Dget_storage_size(dset_id));
-                REQUIRE(storage_size > 0);
-                auto compression_ratio = uncompressed_size / storage_size;
-                std::cout << "Compression ratio: " << compression_ratio << "\n";
-                REQUIRE(compression_ratio > 1);
-            }
-            cleanup(file_id, space_id, dset_id, dcpl_id);
-            status = H5close();
-            REQUIRE(status >= 0);
+            dcpl_id = H5Dget_create_plist(dset_id);
+            REQUIRE(dcpl_id >= 0);
+            THEN("The filter has been applied") {
+                const auto [filter_id, filter_name] = get_filter_info(dcpl_id);
+                REQUIRE(filter_id == jpegls_filter_id);
+                std::cout << "Filter info: " << filter_name << "\n";
 
-            register_plugin();
-            AND_WHEN("The dataset is read back") {
-                file_id = H5Fopen(file_name.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
-                REQUIRE(file_id >= 0);
-                dset_id = H5Dopen(file_id, dataset_name, H5P_DEFAULT);
-                REQUIRE(dset_id >= 0);
-                dcpl_id = H5Dget_create_plist(dset_id);
-                REQUIRE(dcpl_id >= 0);
-                THEN("The filter has been applied") {
-                    const auto [filter_id, filter_name] = get_filter_info(dcpl_id);
-                    REQUIRE(filter_id == jpegls_filter_id);
-                    std::cout << "Filter info: " << filter_name << "\n";
-
-                    AND_THEN("The data is identical to the original") {
-                        std::vector<TestType> actual_data(rows * cols);
-                        status = H5Dread(dset_id, hdf5_type_traits<TestType>::type(), H5S_ALL, H5S_ALL, H5P_DEFAULT, actual_data.data());
-                        REQUIRE(status >= 0);
-                        REQUIRE(data == actual_data);
-                    }
+                AND_THEN("The data is identical to the original") {
+                    std::vector<TestType> actual_data(rows * cols * channels);
+                    status = H5Dread(dset_id, hdf5_type_traits<TestType>::type(), H5S_ALL, H5S_ALL, H5P_DEFAULT, actual_data.data());
+                    REQUIRE(status >= 0);
+                    REQUIRE(data == actual_data);
                 }
             }
         }
     }
-    GIVEN("A 3D array of integers") {
+}
+
+TEMPLATE_TEST_CASE("Scenario: valid data can written to an HDF5 file, compressed, decompressed and read back", "[plugin][template]", uint8_t, int8_t, uint16_t, int16_t) {
+    GIVEN("A small 2D array of integers in a single chunk") {
+        constexpr hsize_t rows = 3;
+        constexpr hsize_t cols = 4;
+        auto data = test_data<TestType>(rows, cols, 1);
+        std::array<hsize_t, 2> dimensions{rows, cols};
+        std::array<unsigned int, 0> params{};
+        roundtrip_test<TestType>(dimensions, dimensions, params);
+    }
+    GIVEN("A 2D array of integers in a single chunk") {
+        constexpr hsize_t rows = 943;
+        constexpr hsize_t cols = 721;
+        auto data = test_data<TestType>(rows, cols, 1);
+        std::array<hsize_t, 2> dimensions{rows, cols};
+        std::array<unsigned int, 0> params{};
+        roundtrip_test<TestType>(dimensions, dimensions, params);
+    }
+    GIVEN("A 3D array of integers in a single chunk") {
         constexpr hsize_t rows = 29;
         constexpr hsize_t cols = 13;
         constexpr hsize_t channels = 3;
         auto data = test_data<TestType>(rows, cols, channels);
         std::array<hsize_t, 3> dimensions{rows, cols, channels};
-        space_id = H5Screate_simple(static_cast<int>(dimensions.size()), dimensions.data(), NULL);
-        REQUIRE(space_id >= 0);
-        WHEN("The array is written to a dataset in a single chunk") {
-            dcpl_id = H5Pcreate(H5P_DATASET_CREATE);
-            REQUIRE(dcpl_id >= 0);
-            status = H5Pset_filter(dcpl_id, jpegls_filter_id, H5Z_FLAG_MANDATORY, 0, NULL);
-            REQUIRE(status >= 0);
-            std::array<hsize_t, 3> chunk{rows, cols, channels};
-            status = H5Pset_chunk(dcpl_id, static_cast<int>(chunk.size()), chunk.data());
-            REQUIRE(status >= 0);
-            dset_id = H5Dcreate(file_id, dataset_name, hdf5_type_traits<TestType>::type(), space_id, H5P_DEFAULT, dcpl_id, H5P_DEFAULT);
-            REQUIRE(dset_id >= 0);
-            status = H5Dwrite(dset_id, hdf5_type_traits<TestType>::type(), H5S_ALL, H5S_ALL, H5P_DEFAULT, data.data());
-            REQUIRE(status >= 0);
-            double uncompressed_size = static_cast<double>(data.size()) * sizeof(TestType);
-            THEN("The storage size of the dataset is less than that of the array") {
-                auto storage_size = static_cast<double>(H5Dget_storage_size(dset_id));
-                REQUIRE(storage_size > 0);
-                auto compression_ratio = uncompressed_size / storage_size;
-                std::cout << "Compression ratio: " << compression_ratio << "\n";
-                REQUIRE(compression_ratio > 1);
-            }
-            cleanup(file_id, space_id, dset_id, dcpl_id);
-            status = H5close();
-            REQUIRE(status >= 0);
-
-            register_plugin();
-            AND_WHEN("The dataset is read back") {
-                file_id = H5Fopen(file_name.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
-                REQUIRE(file_id >= 0);
-                dset_id = H5Dopen(file_id, dataset_name, H5P_DEFAULT);
-                REQUIRE(dset_id >= 0);
-                dcpl_id = H5Dget_create_plist(dset_id);
-                REQUIRE(dcpl_id >= 0);
-                THEN("The filter has been applied") {
-                    const auto [filter_id, filter_name] = get_filter_info(dcpl_id);
-                    REQUIRE(filter_id == jpegls_filter_id);
-                    std::cout << "Filter info: " << filter_name << "\n";
-
-                    AND_THEN("The data is identical to the original") {
-                        std::vector<TestType> actual_data(rows * cols * channels);
-                        status =
-                            H5Dread(dset_id, hdf5_type_traits<TestType>::type(), H5S_ALL, H5S_ALL, H5P_DEFAULT, actual_data.data());
-                        REQUIRE(status >= 0);
-                        REQUIRE(data == actual_data);
-                    }
-                }
-            }
-        }
-        cleanup(file_id, space_id, dset_id, dcpl_id);
+        std::array<unsigned int, 0> params{};
+        roundtrip_test<TestType>(dimensions, dimensions, params);
     }
 }

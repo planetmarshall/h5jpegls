@@ -5,9 +5,9 @@ project(h5jpegls
     DESCRIPTION "JPEG-LS Compression Filter"
     LANGUAGES CXX)
 
-option(H5JPEGLS_STATIC_PLUGIN "Build the library as a static plugin to be linked into an application" OFF)
-option(H5JPEGLS_ENABLE_TESTS "Build the unit tests" ON)
-if (H5JPEGLS_STATIC_PLUGIN)
+option(H5JPEGLS_BUILD_LIBRARY "Build the library as a static plugin to be linked into an application" OFF)
+option(H5JPEGLS_BUILD_TESTS "Build the unit tests" ON)
+if (H5JPEGLS_BUILD_LIBRARY)
     if (CMAKE_BUILD_SHARED)
         message(STATUS "H5JPEGLS: Building Plugin as library (Shared)")
     else()
@@ -39,7 +39,7 @@ find_package(charls REQUIRED)
 find_package(HDF5 REQUIRED COMPONENTS C)
 add_subdirectory(src)
 
-if (H5JPEGLS_ENABLE_TESTS)
+if (H5JPEGLS_BUILD_TESTS)
     find_package(Catch2 QUIET)
     if(NOT Catch2_FOUND)
         message(WARNING "Catch2 not found - C++ tests will not be available")
