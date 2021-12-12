@@ -5,10 +5,12 @@ project(h5jpegls
     DESCRIPTION "JPEG-LS Compression Filter"
     LANGUAGES CXX)
 
-option(H5JPEGLS_BUILD_LIBRARY "Build the library as a static plugin to be linked into an application" OFF)
+option(H5JPEGLS_BUILD_LIBRARY "Build as a library to be linked into an application instead of as a dynamic plugin")
 option(H5JPEGLS_BUILD_TESTS "Build the unit tests" ON)
+option(H5JPEGLS_COMPILE_STRICT "Treat compiler warnings as errors" ON)
+
 if (H5JPEGLS_BUILD_LIBRARY)
-    if (CMAKE_BUILD_SHARED)
+    if (BUILD_SHARED_LIBS)
         message(STATUS "H5JPEGLS: Building Plugin as library (Shared)")
     else()
         message(STATUS "H5JPEGLS: Building Plugin as library (Static)")
@@ -29,9 +31,17 @@ h5jpegls_configure_version_file(${CMAKE_CURRENT_SOURCE_DIR}/src/version.hpp.in $
 
 if (MSVC)
     add_compile_options(/W4 /permissive-)
+    if (H5JPEGLS_COMPILE_STRICT)
+        add_compile_options(/WX)
+    endif()
 else()
     add_compile_options(-Wall -Wpedantic -Wextra -Wno-unknown-pragmas)
-    add_compile_options("$<$<CXX_COMPILER_ID:Clang,AppleClang>:-Wconversion;-Wconditional-uninitialized>")
+    if (CMAKE_CXX_COMPILER_ID MATCHES Clang$)
+        add_compile_options(-Wconversion -Wconditional-uninitialized)
+    endif()
+    if (H5JPEGLS_COMPILE_STRICT)
+        add_compile_options(-Werror)
+    endif()
 endif()
 
 find_package(Threads REQUIRED)
