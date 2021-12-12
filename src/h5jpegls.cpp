@@ -15,8 +15,6 @@
 #include <cstring>
 
 namespace {
-const H5Z_filter_t H5Z_FILTER_JPEGLS = 32012;
-
 struct LegacyCodecParameters {
     static LegacyCodecParameters from_array(const unsigned int params[]) {
         return {.width = params[0], .height = params[1], .bytes_per_pixel = params[2]};
@@ -157,7 +155,7 @@ herr_t h5jpegls_set_local(hid_t dcpl_id, hid_t type_id, hid_t) {
     size_t num_user_parameters = 8;
     std::array<unsigned int, 8> user_parameters{};
     herr_t status =
-        H5Pget_filter_by_id(dcpl_id, H5Z_FILTER_JPEGLS, &flags, &num_user_parameters, user_parameters.data(), 0, nullptr, nullptr);
+        H5Pget_filter_by_id(dcpl_id, h5jpegls::filter_id, &flags, &num_user_parameters, user_parameters.data(), 0, nullptr, nullptr);
 
     if (status < 0) {
         return -1;
@@ -196,7 +194,7 @@ herr_t h5jpegls_set_local(hid_t dcpl_id, hid_t type_id, hid_t) {
     }
 
     auto cd_values = parameters.elements();
-    status = H5Pmodify_filter(dcpl_id, H5Z_FILTER_JPEGLS, flags, cd_values.size(), cd_values.data());
+    status = H5Pmodify_filter(dcpl_id, h5jpegls::filter_id, flags, cd_values.size(), cd_values.data());
 
     if (status < 0) {
         return -1;
@@ -208,7 +206,7 @@ herr_t h5jpegls_set_local(hid_t dcpl_id, hid_t type_id, hid_t) {
 
 extern "C" const H5Z_class2_t H5Z_JPEGLS[1] = {{
     H5Z_CLASS_T_VERS,                 /* H5Z_class_t version */
-    (H5Z_filter_t)H5Z_FILTER_JPEGLS,         /* Filter id number */
+    h5jpegls::filter_id,
     1,              /* encoder_present flag (set to true) */
     1,              /* decoder_present flag (set to true) */
     h5jpegls::description().data(),

@@ -56,6 +56,7 @@ class H5jpeglsConan(ConanFile):
         self._cmake.definitions.update({
             "H5JPEGLS_BUILD_LIBRARY": self.options.library,
             "H5JPEGLS_BUILD_TESTS": self.options.with_tests,
+            "H5JPEGLS_COMPILE_STRICT": False
         })
         self._cmake.configure()
         return self._cmake
