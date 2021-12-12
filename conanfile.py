@@ -12,15 +12,15 @@ class H5jpeglsConan(ConanFile):
     settings = "os", "compiler", "build_type", "arch"
     options = {
         "fPIC": [True, False],
-        "static_plugin": [True, False],
         "shared": [True, False],
-        "enable_tests": [True, False]
+        "library": [True, False],
+        "with_tests": [True, False]
     }
     default_options = {
         "fPIC": True,
-        "static_plugin": True,
         "shared": False,
-        "enable_tests": False
+        "library": True,
+        "with_tests": False
     }
     generators = "cmake", "cmake_find_package"
     scm = {
@@ -35,7 +35,7 @@ class H5jpeglsConan(ConanFile):
             del self.options.fPIC
 
     def configure(self):
-        if not self.options.static_plugin:
+        if not self.options.library:
             self.options["hdf5"].shared = True
 
     def requirements(self):
@@ -43,7 +43,7 @@ class H5jpeglsConan(ConanFile):
         self.requires("charls/2.1.0")
 
     def build_requirements(self):
-        if self.options.enable_tests:
+        if self.options.with_tests:
             self.build_requires("catch2/2.13.7")
         if self.settings.get_safe("compiler.toolset") is None:
             self.build_requires("ninja/1.10.2")
@@ -54,8 +54,8 @@ class H5jpeglsConan(ConanFile):
 
         self._cmake = CMake(self)
         self._cmake.definitions.update({
-            "H5JPEGLS_STATIC_PLUGIN": self.options.static_plugin,
-            "H5JPEGLS_ENABLE_TESTS": self.options.enable_tests,
+            "H5JPEGLS_BUILD_LIBRARY": self.options.library,
+            "H5JPEGLS_BUILD_TESTS": self.options.with_tests,
         })
         self._cmake.configure()
         return self._cmake

@@ -1,5 +1,5 @@
 set(H5JPEGLS_SOURCES h5jpegls.cpp version.hpp ${CMAKE_SOURCE_DIR}/include/h5jpegls/h5jpegls.h)
-if (H5JPEGLS_STATIC_PLUGIN)
+if (H5JPEGLS_BUILD_LIBRARY)
     add_library(h5jpegls h5jpegls.cpp ${H5JPEGLS_SOURCES})
     set_target_properties(h5jpegls PROPERTIES PUBLIC_HEADER ${CMAKE_SOURCE_DIR}/include/h5jpegls/h5jpegls.h)
     target_include_directories(h5jpegls PUBLIC
