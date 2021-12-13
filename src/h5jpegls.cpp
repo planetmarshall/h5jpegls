@@ -10,7 +10,6 @@
 
 #include <array>
 #include <vector>
-#include <cassert>
 #include <cstdio>
 #include <cstring>
 
@@ -215,12 +214,14 @@ extern "C" const H5Z_class2_t H5Z_JPEGLS[1] = {{
     codec_filter,         /* The actual filter function */
 }};
 
+#ifndef H5JPEGLS_BUILD_LIBRARY
 extern "C" H5PL_type_t H5PLget_plugin_type(void) {
     return H5PL_TYPE_FILTER; 
 }
 extern "C" const void *H5PLget_plugin_info(void) {
     return H5Z_JPEGLS;
 }
+#endif
 
 void h5jpegls::register_plugin() {
     h5jpegls_register_plugin();
