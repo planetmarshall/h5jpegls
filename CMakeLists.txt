@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.15)
 project(h5jpegls 
     VERSION 1.0.0
-    HOMEPAGE_URL https://github.com/planetmarshall/jpegls-hdf-filter
+    HOMEPAGE_URL https://github.com/planetmarshall/h5jpegls
     DESCRIPTION "JPEG-LS Compression Filter"
     LANGUAGES CXX)
 
